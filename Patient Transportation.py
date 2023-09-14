@@ -22,8 +22,9 @@ if __name__ == "__main__":
     for place in data["places"]:
         places.append(place["id"]) # TODO - do we need to sort to match adjMatrix?
 
+    vehicles = []
     for vehicle in data["vehicles"]:
-        pass
+        vehicles = vehicles.append(vehicle)
 
     for patient in data["patients"]:
         pass
