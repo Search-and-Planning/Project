@@ -18,8 +18,9 @@ if __name__ == "__main__":
     sameVehicleBackwards = data["sameVehicleBackwards"] # Boolean
 
     ### Instance specific structure ###
+    places = []
     for place in data["places"]:
-        pass
+        places.append(place["id"]) # TODO - do we need to sort to match adjMatrix?
 
     for vehicle in data["vehicles"]:
         pass
@@ -28,6 +29,12 @@ if __name__ == "__main__":
         pass
 
     adjMatrix = data["distMatrix"]
+
+
+    ### Decision Variables ###
+    # array R of binary (0-1) variables. R[i] = 1 means request i was selected
+    # array A of activities (see Eq. 1) of (A_origin, A_destiny) - dividir em 2 arrays?
+
 
     # Do stuff
 
