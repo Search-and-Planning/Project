@@ -27,10 +27,16 @@ array[1..numVehicles] of record(int: capacity, set of categories: compatiblePati
 
 array[1..numPlaces, 1..numPlaces] of int: distMatrix; % TODO - Do we need to replace int by float?
 
+array[1..numActivities] of categories: patientCategory; % category of the patient of the ith activity
+
 
 %array[1..R] of record(int: start, int: duration): appointment;
 array[1..R] of int: appointmentTime; % appointmentTime[i] = starting time of appointment for request i. (ui in the literature)
 array[1..R] of int: appointmentDuration; % duration of the ith request's appointment. (di in the literature)
+
+int: max; % placeholder (H time Horizon in the literature)
+int: min; % placeholder
+int: maxTime; % placeholder
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Decision Variables %%%
@@ -45,6 +51,8 @@ array[1..numActivities] of var 1..numVehicles: assignedVehicle; % assignedVehicl
 array[1..numActivities] of var 1..numPlaces: locations;
 
 array[1..R] of var bool: S; % S[i] = 1 if request i is selected, 0 otherwise
+array[1..numActivities] of var 0..maxTime: start; % placeholder for the domain
+array[1..numActivities] of var min..max: end; % placeholders for the domain
 
 
 % TODO - pensar em como representar a "load" de um veiculo num dado instante, porque não podemos exceder a capacidade
