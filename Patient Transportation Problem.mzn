@@ -42,17 +42,21 @@ int: maxTime; % placeholder
 %%% Decision Variables %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 
+% Activity Variables %
+
 array[1..numActivities] of var 1..numVehicles: assignedVehicle; % assignedVehicle[i] is the vehicle assigned to activity i
 
 % location[i] = some place
 % if i % 2 == 0: Then location[i] is the origin location of activity i
 % else: it is the destination location of activity i
 % TODO - handling requests without return activity?
-array[1..numActivities] of var 1..numPlaces: locations;
+array[1..numActivities] of var 1..numPlaces: locations; % TODO - acho que isto nem é preciso. Os sitios de cada atividade são estáticos. Não há decisões a tomar quanto a isso (aka Equação 1 acho que não é uma decision variable)
 
-array[1..R] of var bool: S; % S[i] = 1 if request i is selected, 0 otherwise
 array[1..numActivities] of var 0..maxTime: start; % placeholder for the domain
 array[1..numActivities] of var min..max: end; % placeholders for the domain
+
+% Request Variable %
+array[1..R] of var bool: S; % S[i] = 1 if request i is selected, 0 otherwise
 
 
 % TODO - pensar em como representar a "load" de um veiculo num dado instante, porque não podemos exceder a capacidade
