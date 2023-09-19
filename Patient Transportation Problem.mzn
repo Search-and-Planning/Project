@@ -33,6 +33,9 @@ array[1..numActivities] of categories: patientCategory; % category of the patien
 %array[1..R] of record(int: start, int: duration): appointment;
 array[1..R] of int: appointmentTime; % appointmentTime[i] = starting time of appointment for request i. (ui in the literature)
 array[1..R] of int: appointmentDuration; % duration of the ith request's appointment. (di in the literature)
+array[1..R] of int: startLocation;
+array[1..R] of int: destination;
+array[1..R] of int: endLocation;
 
 int: max; % placeholder (H time Horizon in the literature)
 int: min; % placeholder -> menor dos tempos de início de consulta + menor duração
@@ -45,43 +48,47 @@ int: maxTime; % placeholder  -> maior dos tempos de início de consulta
 % Activity Variables %
 
 array[1..numActivities] of var 1..numVehicles: assignedVehicle; % assignedVehicle[i] is the vehicle assigned to activity i
-
-% location[i] = some place
-% if i % 2 == 0: Then location[i] is the origin location of activity i
-% else: it is the destination location of activity i
-% TODO - handling requests without return activity?
-array[1..numActivities] of var 1..numPlaces: locations; % TODO - acho que isto nem é preciso. Os sitios de cada atividade são estáticos. Não há decisões a tomar quanto a isso (aka Equação 1 acho que não é uma decision variable)
-
-array[1..numActivities] of var 0..maxTime: start; % placeholder for the domain
-array[1..numActivities] of var min..max: end; % placeholders for the domain
+array[1..numActivities] of var 0..maxTime: s; % placeholder for the domain
+array[1..numActivities] of var min..max: e; % placeholders for the domain
 array[1..numActivities] of var bool: x;
 
 % Request Variable %
 array[1..R] of var bool: S; % S[i] = 1 if request i is selected, 0 otherwise
 
 
-% TODO - pensar em como representar a "load" de um veiculo num dado instante, porque não podemos exceder a capacidade
-
-
 %%%%%%%%%%%%%%%%%%%
 %%% Constraints %%%
 %%%%%%%%%%%%%%%%%%%
 
-% (Binding Requests to Activities) Equation 4 in the literature
+% (Empty Locations) Equation 17 in the literature
 % Selecting a Request is equivalent to selecting the corresponding
-% forward and backward activities
+% at least the forward or backward activity
+% TODO - still need to ensure that the activities that required both types (i think it's done?)
+% have them match
 constraint
   forall(i in 1..R)(
-    ( S[i] == 1 -> (x[(2 * i) - 1] /\ x[2 * i]) )
+    ( S[i] == 1 -> (x[(2 * i) - 1] == 1 \/ x[2 * i] == 1) )
     /\
-    ( (x[(2 * i) - 1] /\ x[2 * i]) -> S[i] == 1 )
-  );
+    ( (x[(2 * i) - 1] == 1 \/ x[2 * i] == 1) -> S[i] == 1 )
+);
+
+% Don't select forward activity if the request doesn't have one
+% TODO - Check if we really need this one
+constraint
+  forall(i in 1..R)
+    (startLocation[i] == -1 -> x[(2 * i) - 1] == 0);
+
+% Don't select backward activity if the request doesn't have one
+% TODO - Check if we really need this one
+constraint
+  forall(i in 1..R)
+    (endLocation[i] == -1 -> x[(2 * i) - 1] == 0);
 
 % (Forward and Backward Selection) Equation 5 in the literature
 % If a forward activity is selected, the corresponding backward activity
 % must be aswell
-constraint
-  forall(i in 1..R)(x[(2 * i) - 1] == x[2 * i]);
+%constraint
+%  forall(i in 1..R)(x[(2 * i) - 1] == x[2 * i]);
 
 %%%%%%%%%%%%
 %%% Goal %%%
