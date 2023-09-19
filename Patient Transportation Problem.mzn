@@ -35,8 +35,8 @@ array[1..R] of int: appointmentTime; % appointmentTime[i] = starting time of app
 array[1..R] of int: appointmentDuration; % duration of the ith request's appointment. (di in the literature)
 
 int: max; % placeholder (H time Horizon in the literature)
-int: min; % placeholder
-int: maxTime; % placeholder
+int: min; % placeholder -> menor dos tempos de início de consulta + menor duração
+int: maxTime; % placeholder  -> maior dos tempos de início de consulta
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Decision Variables %%%
@@ -54,6 +54,7 @@ array[1..numActivities] of var 1..numPlaces: locations; % TODO - acho que isto n
 
 array[1..numActivities] of var 0..maxTime: start; % placeholder for the domain
 array[1..numActivities] of var min..max: end; % placeholders for the domain
+array[1..numActivities] of var bool: x;
 
 % Request Variable %
 array[1..R] of var bool: S; % S[i] = 1 if request i is selected, 0 otherwise
@@ -65,6 +66,22 @@ array[1..R] of var bool: S; % S[i] = 1 if request i is selected, 0 otherwise
 %%%%%%%%%%%%%%%%%%%
 %%% Constraints %%%
 %%%%%%%%%%%%%%%%%%%
+
+% (Binding Requests to Activities) Equation 4 in the literature
+% Selecting a Request is equivalent to selecting the corresponding
+% forward and backward activities
+constraint
+  forall(i in 1..R)(
+    ( S[i] == 1 -> (x[(2 * i) - 1] /\ x[2 * i]) )
+    /\
+    ( (x[(2 * i) - 1] /\ x[2 * i]) -> S[i] == 1 )
+  );
+
+% (Forward and Backward Selection) Equation 5 in the literature
+% If a forward activity is selected, the corresponding backward activity
+% must be aswell
+constraint
+  forall(i in 1..R)(x[(2 * i) - 1] == x[2 * i]);
 
 %%%%%%%%%%%%
 %%% Goal %%%
