@@ -55,6 +55,17 @@ array[1..numActivities] of var bool: x;
 array[1..R] of var bool: S; % S[i] = 1 if request i is selected, 0 otherwise
 
 
+%%%%%%%%%%%%%%%%%%
+%%%  Functions %%%
+%%%    and     %%%
+%%% Predicates %%%
+%%%%%%%%%%%%%%%%%%
+
+function int: nthForwardActivity(int: n) = (2 * n) - 1;
+
+function int: nthBackwardActivity(int: n) = 2 * n;
+
+
 %%%%%%%%%%%%%%%%%%%
 %%% Constraints %%%
 %%%%%%%%%%%%%%%%%%%
@@ -66,29 +77,29 @@ array[1..R] of var bool: S; % S[i] = 1 if request i is selected, 0 otherwise
 % have them match
 constraint
   forall(i in 1..R)(
-    ( S[i] == 1 -> (x[(2 * i) - 1] == 1 \/ x[2 * i] == 1) )
+    ( S[i] == 1 -> (x[nthForwardActivity(i)] == 1 \/ x[nthBackwardActivity(i)] == 1) )
     /\
-    ( (x[(2 * i) - 1] == 1 \/ x[2 * i] == 1) -> S[i] == 1 )
+    ( (x[nthForwardActivity(i)] == 1 \/ x[nthBackwardActivity(i)] == 1) -> S[i] == 1 )
 );
 
 % Don't select forward activity if the request doesn't have one
 % TODO - Check if we really need this one
 constraint
   forall(i in 1..R)
-    (startLocation[i] == -1 -> x[(2 * i) - 1] == 0);
+    (startLocation[i] == -1 -> x[nthForwardActivity(i)] == 0);
 
 % Don't select backward activity if the request doesn't have one
 % TODO - Check if we really need this one
 constraint
   forall(i in 1..R)
-    (endLocation[i] == -1 -> x[(2 * i) - 1] == 0);
+    (endLocation[i] == -1 -> x[nthBackwardActivity(i)] == 0);
     
 % (Inter-Activity Time Travel Consistency) Equation 6 in the literature
 % TODO - could it work with j in i..R? I think they're equivalent, but could j in 1..R prune the search more?
 constraint
   forall(i,j in 1..R)(1 == 1); % TODO - Finish this equation
   
-  
+
 % TODO - add constraints for start and end time when forward/backward activity isn't selected?
 
 % (Forward and Backward Selection) Equation 5 in the literature
