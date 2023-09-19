@@ -15,7 +15,6 @@ include "cumulative.mzn";
 %%%%%%%%%%%%%%%%%%
 
 par int: numVehicles;
-par int: numPatients; % Do I need this? Probably replace by request/activity
 par int: numPlaces;
 par int: numPatientCategories;
 
@@ -30,7 +29,7 @@ array[1..numPlaces, 1..numPlaces] of int: distMatrix; % TODO - Do we need to rep
 array[1..numActivities] of categories: patientCategory; % category of the patient of the ith activity
 
 
-%array[1..R] of record(int: start, int: duration): appointment;
+% TODO - replace by record type?
 array[1..R] of int: appointmentTime; % appointmentTime[i] = starting time of appointment for request i. (ui in the literature)
 array[1..R] of int: appointmentDuration; % duration of the ith request's appointment. (di in the literature)
 array[1..R] of int: startLocation;
@@ -83,6 +82,14 @@ constraint
 constraint
   forall(i in 1..R)
     (endLocation[i] == -1 -> x[(2 * i) - 1] == 0);
+    
+% (Inter-Activity Time Travel Consistency) Equation 6 in the literature
+% TODO - could it work with j in i..R? I think they're equivalent, but could j in 1..R prune the search more?
+constraint
+  forall(i,j in 1..R)(1 == 1); % TODO - Finish this equation
+  
+  
+% TODO - add constraints for start and end time when forward/backward activity isn't selected?
 
 % (Forward and Backward Selection) Equation 5 in the literature
 % If a forward activity is selected, the corresponding backward activity
