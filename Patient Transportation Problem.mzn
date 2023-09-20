@@ -46,9 +46,9 @@ int: maxTime; % placeholder  -> maior dos tempos de início de consulta
 
 % Activity Variables %
 
-array[1..numActivities] of var 1..numVehicles: assignedVehicle; % assignedVehicle[i] is the vehicle assigned to activity i
 array[1..numActivities] of var 0..maxTime: s; % placeholder for the domain
 array[1..numActivities] of var min..max: e; % placeholders for the domain
+array[1..numActivities] of var 1..numVehicles: v; % assignedVehicle[i] is the vehicle assigned to activity i
 array[1..numActivities] of var bool: x;
 
 % Request Variable %
@@ -65,6 +65,8 @@ function int: nthForwardActivity(int: n) = (2 * n) - 1;
 
 function int: nthBackwardActivity(int: n) = 2 * n;
 
+% TODO - does this work? returning var int seems strange
+function var int: duration(int: activity) = e[activity] - s[activity];
 
 %%%%%%%%%%%%%%%%%%%
 %%% Constraints %%%
@@ -95,9 +97,17 @@ constraint
     (endLocation[i] == -1 -> x[nthBackwardActivity(i)] == 0);
     
 % (Inter-Activity Time Travel Consistency) Equation 6 in the literature
-% TODO - could it work with j in i..R? I think they're equivalent, but could j in 1..R prune the search more?
+% TODO - finish distMatrix part of inequalities
 constraint
-  forall(i,j in 1..R)(1 == 1); % TODO - Finish this equation
+  forall(i in 1..numActivities, j in i+1..numActivities)(
+    (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
+    /\
+    (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
+    /\
+    (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
+    /\
+    (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
+); % TODO - How to handle non-existent forward/backward activities???
   
 
 % TODO - add constraints for start and end time when forward/backward activity isn't selected?
