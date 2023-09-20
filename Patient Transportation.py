@@ -26,8 +26,31 @@ if __name__ == "__main__":
     for vehicle in data["vehicles"]:
         vehicles = vehicles.append(vehicle)
 
+    start = []
+    destination = []
+    end = []
+    appointmentStart = []
+    appointmentDuration = []
+    embarkDuration = []
     for patient in data["patients"]:
-        pass
+        s = patient["start"]
+        d = patient["destination"]
+        e = patient["end"]
+        appStart = patient["rdvTime"]
+        appDuration = patient["rdvDuration"]
+        embar = patient("srvDuration")
+        if (s == -1):
+            # No forward activity for this request
+            s = d
+        if (e == -1):
+            # No backward activity for this request
+            e = d
+        start.append(s)
+        destination.append(d)
+        end.append(e)
+        appointmentStart.append(appStart)
+        appointmentDuration.append(appDuration)
+        embarkDuration.append(embar)
 
     adjMatrix = data["distMatrix"]
 
