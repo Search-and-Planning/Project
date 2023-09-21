@@ -106,6 +106,18 @@ constraint
     forall(i in 1..R)
       (v[nthForwardActivity(i)] == v[nthBackwardActivity(i)])
   endif;
+  
+
+% If an activity isn't selected, the values for the assigned vehicle,
+% starting time and end should be absent
+constraint
+  forall(i in 1..numActivities)(
+    ( (x[i] == 0) -> (v[i] = <>) )
+    /\
+    ( (x[i] == 0) -> (s[i] = <>) )
+    /\
+    ( (x[i] == 0) -> (e[i] = <>) )
+);
 
     
 % (Inter-Activity Time Travel Consistency) Equation 6 in the literature
