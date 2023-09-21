@@ -27,7 +27,7 @@ array[1..numVehicles] of record(int: capacity, set of categories: compatiblePati
 
 array[1..numPlaces, 1..numPlaces] of int: distMatrix; % TODO - Do we need to replace int by float?
 
-array[1..numActivities] of categories: patientCategory; % category of the patient of the ith activity
+array[1..R] of categories: patientCategory; % category of the patient of the ith request
 
 
 % TODO - replace by record type?
@@ -119,6 +119,15 @@ constraint
     ( (x[i] == 0) -> (e[i] = <>) )
 );
 
+
+% Patients can only be taken by some vehicle categories
+constraint
+  forall(i in 1..R)(
+    member(vehicle[nthForwardActivity(i)].compatiblePatients, patientCategory[i])
+    /\
+    member(vehicle[nthBackwardActivity(i)].compatiblePatients, patientCategory[i])
+); % TODO - handle option types
+
     
 % (Inter-Activity Time Travel Consistency) Equation 6 in the literature
 % TODO - finish distMatrix part of inequalities
@@ -134,7 +143,7 @@ constraint
       (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
     endif
 ); % TODO - How to handle non-existent forward/backward activities???
-  
+
 
 % TODO - add constraints for start and end time when forward/backward activity isn't selected?
 
