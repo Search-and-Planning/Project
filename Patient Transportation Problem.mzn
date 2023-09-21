@@ -17,6 +17,7 @@ include "cumulative.mzn";
 par int: numVehicles;
 par int: numPlaces;
 par int: numPatientCategories;
+par bool: sameVehicleBackwards;
 
 set of 1..numPatientCategories: categories;
 par int: R; % Number of requests
@@ -46,9 +47,11 @@ int: maxTime; % placeholder  -> maior dos tempos de início de consulta
 
 % Activity Variables %
 
-array[1..numActivities] of var 0..maxTime: s; % placeholder for the domain
-array[1..numActivities] of var min..max: e; % placeholders for the domain
-array[1..numActivities] of var 1..numVehicles: v; % assignedVehicle[i] is the vehicle assigned to activity i
+% s, e and v are optional types, because they only matter if the activity
+% has been selected
+array[1..numActivities] of var opt 0..maxTime: s; % placeholder for the domain
+array[1..numActivities] of var opt min..max: e; % placeholders for the domain
+array[1..numActivities] of var opt 1..numVehicles: v; % assignedVehicle[i] is the vehicle assigned to activity i
 array[1..numActivities] of var bool: x;
 
 % Request Variable %
@@ -95,6 +98,15 @@ constraint
 constraint
   forall(i in 1..R)
     (endLocation[i] == -1 -> x[nthBackwardActivity(i)] == 0);
+    
+    
+% Instances restricting forward and backward activities to have the same vehicle
+constraint
+  if sameVehicleBackwards then
+    forall(i in 1..R)
+      (v[nthForwardActivity(i)] == v[nthBackwardActivity(i)])
+  endif;
+
     
 % (Inter-Activity Time Travel Consistency) Equation 6 in the literature
 % TODO - finish distMatrix part of inequalities
