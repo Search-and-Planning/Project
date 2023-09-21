@@ -124,13 +124,15 @@ constraint
 % TODO - finish distMatrix part of inequalities
 constraint
   forall(i in 1..numActivities, j in i+1..numActivities)(
-    (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
-    /\
-    (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
-    /\
-    (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
-    /\
-    (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
+    if occurs(v[i]) then % if optional value isn't absent
+      (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
+      /\
+      (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
+      /\
+      (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
+      /\
+      (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
+    endif
 ); % TODO - How to handle non-existent forward/backward activities???
   
 
