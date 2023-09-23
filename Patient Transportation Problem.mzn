@@ -31,8 +31,8 @@ array[1..R] of categories: patientCategory; % category of the patient of the ith
 
 
 % TODO - replace by record type?
-array[1..R] of int: appointmentTime; % appointmentTime[i] = starting time of appointment for request i. (ui in the literature)
-array[1..R] of int: appointmentDuration; % duration of the ith request's appointment. (di in the literature)
+array[1..R] of int: rdvTime; % rdvTime[i] = starting time of appointment for request i. (ui in the literature)
+array[1..R] of int: rdvDuration; % duration of the ith request's appointment. (di in the literature)
 array[1..R] of int: startLocation;
 array[1..R] of int: destination;
 array[1..R] of int: endLocation;
@@ -72,12 +72,12 @@ function int: activityStartLocation(int: n) =
   if (n mod 2) == 1 then
     startLocation[n mod 2] % Forward activity
   else
-    destinationLocation[n mod 2] % Backward Activity
+    destination[n mod 2] % Backward Activity
   endif;
   
 function int: activityEndLocation(int: n) =
   if (n mod 2) == 1 then
-    destinationLocation[n mod 2] % Forward activity
+    destination[n mod 2] % Forward activity
   else
     endLocation[n mod 2] % Backward Activity
   endif;
@@ -173,7 +173,12 @@ constraint
 
 % (Maximum Travel Time) Equation 8 in the literature
 % Prevents situations where a patient stays too long in a vehicle
-constraint true; % TODO - Implement
+constraint
+  forall(i in 1..numActivities)
+    (duration(i) <= -100); % TODO - take care of the placeholder value
+    
+    
+% maxWaitTime constraint? Ver enunciado
 
 
 %%%%%%%%%%%%
