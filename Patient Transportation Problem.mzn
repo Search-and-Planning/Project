@@ -144,19 +144,22 @@ constraint
 
     
 % (Inter-Activity Time Travel Consistency) Equation 6 in the literature
-% TODO - finish distMatrix part of inequalities
 constraint
   forall(i in 1..numActivities, j in i+1..numActivities)(
     if occurs(v[i]) then % if optional value isn't absent
-      (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
+      (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[activityStartLocation(i), activityStartLocation(j)])
+                      \/ ( s[i] - s[j] >= distMatrix[activityStartLocation(j), activityStartLocation(i)]) )
       /\
-      (v[i] == v[j]) -> ( (s[j] - e[i] >= distMatrix[,]) \/ ( e[i] - s[j] >= distMatrix[,]) )
+      (v[i] == v[j]) -> ( (s[j] - e[i] >= distMatrix[activityStartLocation(i), activityEndLocation(j)]) 
+                      \/ ( e[i] - s[j] >= distMatrix[activityStartLocation(j), activityEndLocation(i)]) )
       /\
-      (v[i] == v[j]) -> ( (e[j] - s[i] >= distMatrix[,]) \/ ( s[i] - e[j] >= distMatrix[,]) )
+      (v[i] == v[j]) -> ( (e[j] - s[i] >= distMatrix[activityEndLocation(i), activityStartLocation(j)]) 
+                      \/ ( s[i] - e[j] >= distMatrix[activityEndLocation(j), activityStartLocation(i)]) )
       /\
-      (v[i] == v[j]) -> ( (e[j] - e[i] >= distMatrix[,]) \/ ( e[i] - e[j] >= distMatrix[,]) )
+      (v[i] == v[j]) -> ( (e[j] - e[i] >= distMatrix[activityEndLocation(i), activityEndLocation(j)]) 
+                      \/ ( e[i] - e[j] >= distMatrix[activityEndLocation(j), activityEndLocation(i)]) )
     endif
-); % TODO - How to handle non-existent forward/backward activities???
+); % TODO - How to handle non-existent forward/backward activities??? (Maybe the if is enough to cover that)
 % TODO - need to take into account embark time (ver email do David)
 
 
