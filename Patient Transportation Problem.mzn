@@ -123,7 +123,7 @@ constraint
   
 
 % If an activity isn't selected, the values for the assigned vehicle,
-% starting time and end should be absent
+% starting time and end time should be absent
 constraint
   forall(i in 1..numActivities)(
     ( (x[i] == 0) -> (v[i] = <>) )
@@ -163,13 +163,18 @@ constraint
 % TODO - need to take into account embark time (ver email do David)
 
 
-% TODO - add constraints for start and end time when forward/backward activity isn't selected?
+% (Intra-Activity Time Travel Consistency) Equation 7 in the literature
+% The duration of each activity cannot be lesser than the time required 
+% to go from the origin to the destination
+constraint
+  forall(i in 1..numActivities)
+    (duration(i) >= distMatrix[activityStartLocation(i), activityEndLocation(i)]);
+    
 
-% (Forward and Backward Selection) Equation 5 in the literature
-% If a forward activity is selected, the corresponding backward activity
-% must be aswell
-%constraint
-%  forall(i in 1..R)(x[(2 * i) - 1] == x[2 * i]);
+% (Maximum Travel Time) Equation 8 in the literature
+% Prevents situations where a patient stays too long in a vehicle
+constraint true; % TODO - Implement
+
 
 %%%%%%%%%%%%
 %%% Goal %%%
