@@ -68,6 +68,20 @@ function int: nthForwardActivity(int: n) = (2 * n) - 1;
 
 function int: nthBackwardActivity(int: n) = 2 * n;
 
+function int: activityStartLocation(int: n) = 
+  if (n mod 2) == 1 then
+    startLocation[n mod 2] % Forward activity
+  else
+    destinationLocation[n mod 2] % Backward Activity
+  endif;
+  
+function int: activityEndLocation(int: n) =
+  if (n mod 2) == 1 then
+    destinationLocation[n mod 2] % Forward activity
+  else
+    endLocation[n mod 2] % Backward Activity
+  endif;
+
 % TODO - does this work? returning var int seems strange
 function var int: duration(int: activity) = e[activity] - s[activity];
 
@@ -77,7 +91,7 @@ function var int: duration(int: activity) = e[activity] - s[activity];
 
 % (Empty Locations) Equation 17 in the literature
 % Selecting a Request is equivalent to selecting the corresponding
-% at least the forward or backward activity
+% forward or backward activity
 % TODO - still need to ensure that the activities that required both types (i think it's done?)
 % have them match
 constraint
@@ -123,10 +137,10 @@ constraint
 % Patients can only be taken by some vehicle categories
 constraint
   forall(i in 1..R)(
-    member(vehicle[nthForwardActivity(i)].compatiblePatients, patientCategory[i])
+    member(vehicle[v[nthForwardActivity(i)]].compatiblePatients, patientCategory[i])
     /\
-    member(vehicle[nthBackwardActivity(i)].compatiblePatients, patientCategory[i])
-); % TODO - handle option types
+    member(vehicle[v[nthBackwardActivity(i)]].compatiblePatients, patientCategory[i])
+); % TODO - handle option types;
 
     
 % (Inter-Activity Time Travel Consistency) Equation 6 in the literature
@@ -136,13 +150,14 @@ constraint
     if occurs(v[i]) then % if optional value isn't absent
       (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
       /\
-      (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
+      (v[i] == v[j]) -> ( (s[j] - e[i] >= distMatrix[,]) \/ ( e[i] - s[j] >= distMatrix[,]) )
       /\
-      (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
+      (v[i] == v[j]) -> ( (e[j] - s[i] >= distMatrix[,]) \/ ( s[i] - e[j] >= distMatrix[,]) )
       /\
-      (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[,]) \/ ( s[i] - s[j] >= distMatrix[,]) )
+      (v[i] == v[j]) -> ( (e[j] - e[i] >= distMatrix[,]) \/ ( e[i] - e[j] >= distMatrix[,]) )
     endif
 ); % TODO - How to handle non-existent forward/backward activities???
+% TODO - need to take into account embark time (ver email do David)
 
 
 % TODO - add constraints for start and end time when forward/backward activity isn't selected?
