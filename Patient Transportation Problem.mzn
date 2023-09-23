@@ -23,7 +23,9 @@ set of 1..numPatientCategories: categories;
 par int: R; % Number of requests
 int: numActivities = 2 * R; % Request = Forward Activity + Backwards Activity
 
-array[1..numVehicles] of record(int: capacity, set of categories: compatiblePatients): vehicle;
+%array[1..numVehicles] of record(int: capacity, set of categories: compatiblePatients): vehicle;
+array[1..numVehicles] of int: capacity;
+array[1..numVehicles] of set of categories: compatiblePatients;
 
 array[1..numPlaces, 1..numPlaces] of int: distMatrix; % TODO - Do we need to replace int by float?
 
@@ -49,9 +51,11 @@ int: maxTime; % placeholder  -> maior dos tempos de início de consulta
 
 % s, e and v are optional types, because they only matter if the activity
 % has been selected
-array[1..numActivities] of var opt 0..maxTime: s; % placeholder for the domain
-array[1..numActivities] of var opt min..max: e; % placeholders for the domain
-array[1..numActivities] of var opt 1..numVehicles: v; % assignedVehicle[i] is the vehicle assigned to activity i
+array[1..numActivities] of var 0..maxTime: s; % placeholder for the domain
+array[1..numActivities] of var min..max: e; % placeholders for the domain
+
+% 0 represents that no vehicle was selected
+array[1..numActivities] of var 0..numVehicles: v; % assignedVehicle[i] is the vehicle assigned to activity i
 array[1..numActivities] of var bool: x;
 
 % Request Variable %
@@ -126,27 +130,32 @@ constraint
 % starting time and end time should be absent
 constraint
   forall(i in 1..numActivities)(
-    ( (x[i] == 0) -> (v[i] = <>) )
+    ( (x[i] == 0) -> (v[i] = 0) )
     /\
-    ( (x[i] == 0) -> (s[i] = <>) )
+    ( (x[i] == 0) -> (s[i] = 0) )
     /\
-    ( (x[i] == 0) -> (e[i] = <>) )
+    ( (x[i] == 0) -> (e[i] = min) )
 );
 
 
 % Patients can only be taken by some vehicle categories
 constraint
   forall(i in 1..R)(
-    member(vehicle[v[nthForwardActivity(i)]].compatiblePatients, patientCategory[i])
+    if v[nthForwardActivity(i)] != 0 then
+      % Used let and in keywords to handle var opt type of v[]
+      patientCategory[i] in compatiblePatients[v[nthForwardActivity(i)]]
+    endif
     /\
-    member(vehicle[v[nthBackwardActivity(i)]].compatiblePatients, patientCategory[i])
-); % TODO - handle option types;
+    if v[nthBackwardActivity(i)] != 0 then
+      patientCategory[i] in compatiblePatients[v[nthBackwardActivity(i)]]
+    endif
+); % TODO - Try replacing the if condition by x[] != 0 and see if the inference improves or worsens
 
     
 % (Inter-Activity Time Travel Consistency) Equation 6 in the literature
 constraint
   forall(i in 1..numActivities, j in i+1..numActivities)(
-    if occurs(v[i]) then % if optional value isn't absent
+    if v[i] != 0 /\ v[j] != 0 then % if vehicles were selected for the activities
       (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[activityStartLocation(i), activityStartLocation(j)])
                       \/ ( s[i] - s[j] >= distMatrix[activityStartLocation(j), activityStartLocation(i)]) )
       /\
