@@ -86,6 +86,13 @@ function int: activityEndLocation(int: n) =
   else
     endLocation[n mod 2] % Backward Activity
   endif;
+  
+function int: activityTimeLowerBound(int: n) =
+  if (n mod 2) == 1 then
+    0 % Forward activity
+  else
+    rdvTime[n] + rdvDuration[n] + maxWaitTime % Backward Activity
+  endif;
 
 function var int: duration(int: activity) = e[activity] - s[activity];
 
@@ -124,7 +131,7 @@ constraint
   forall(i in 1..R)(
     ( (0 <= s[nthForwardActivity(i)]) /\ (s[nthForwardActivity(i)] <= (rdvTime[i] - maxWaitTime) ) )
     /\
-    ( ( (rdvTime[i] + rdvDuration + maxWaitTime) <= s[nthBackwardActivity(i)]) /\ (s[nthBackwardActivity(i)] <= timeHorizon) )
+    ( ( (rdvTime[i] + rdvDuration[i] + maxWaitTime) <= s[nthBackwardActivity(i)]) /\ (s[nthBackwardActivity(i)] <= timeHorizon) )
 );
     
 % TODO - see if there is a change in performance by combining the e[] domain constraint
@@ -136,7 +143,7 @@ constraint
     ( (0 <= e[nthForwardActivity(i)]) /\ (e[nthForwardActivity(i)] <= (rdvTime[i] - maxWaitTime)) )
     /\
     % Restrict domain for end of backward activities
-    ( ( (rdvTime[i] + rdvDuration + maxWaitTime) <= e[nthBackwardActivity(i)]) /\ (e[nthBackwardActivity(i)] <= timeHorizon) )
+    ( ( (rdvTime[i] + rdvDuration[i] + maxWaitTime) <= e[nthBackwardActivity(i)]) /\ (e[nthBackwardActivity(i)] <= timeHorizon) )
 );  
     
     
@@ -156,7 +163,7 @@ constraint
     /\
     ( (x[i] == 0) -> (s[i] = 0) )
     /\
-    ( (x[i] == 0) -> (e[i] = min) )
+    ( (x[i] == 0) -> (e[i] = activityTimeLowerBound(i)) )
 );
 
 
