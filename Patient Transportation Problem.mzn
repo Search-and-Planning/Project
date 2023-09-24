@@ -18,6 +18,7 @@ par int: numVehicles;
 par int: numPlaces;
 par int: numPatientCategories;
 par bool: sameVehicleBackwards;
+par int: maxWaitTime;
 
 set of 1..numPatientCategories: categories;
 par int: R; % Number of requests
@@ -32,16 +33,13 @@ array[1..numPlaces, 1..numPlaces] of int: distMatrix; % TODO - Do we need to rep
 array[1..R] of categories: patientCategory; % category of the patient of the ith request
 
 
-% TODO - replace by record type?
 array[1..R] of int: rdvTime; % rdvTime[i] = starting time of appointment for request i. (ui in the literature)
 array[1..R] of int: rdvDuration; % duration of the ith request's appointment. (di in the literature)
 array[1..R] of int: startLocation;
 array[1..R] of int: destination;
 array[1..R] of int: endLocation;
 
-int: max; % placeholder (H time Horizon in the literature)
-int: min; % placeholder -> menor dos tempos de início de consulta + menor duração
-int: maxTime; % placeholder  -> maior dos tempos de início de consulta
+int: timeHorizon;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Decision Variables %%%
@@ -49,13 +47,15 @@ int: maxTime; % placeholder  -> maior dos tempos de início de consulta
 
 % Activity Variables %
 
-% s, e and v are optional types, because they only matter if the activity
-% has been selected
-array[1..numActivities] of var 0..maxTime: s; % placeholder for the domain
-array[1..numActivities] of var min..max: e; % placeholders for the domain
+%array[1..numActivities] of var 0..maxTime-maxWaitTime: s; % placeholder for the domain
+%array[1..numActivities] of var min..max: e; % placeholders for the domain
+array[1..numActivities] of var 0..timeHorizon: s;
+array[1..numActivities] of var 0..timeHorizon: e;
 
+
+% v[i] is the vehicle assigned to activity i
 % 0 represents that no vehicle was selected
-array[1..numActivities] of var 0..numVehicles: v; % assignedVehicle[i] is the vehicle assigned to activity i
+array[1..numActivities] of var 0..numVehicles: v;
 array[1..numActivities] of var bool: x;
 
 % Request Variable %
@@ -86,7 +86,6 @@ function int: activityEndLocation(int: n) =
     endLocation[n mod 2] % Backward Activity
   endif;
 
-% TODO - does this work? returning var int seems strange
 function var int: duration(int: activity) = e[activity] - s[activity];
 
 %%%%%%%%%%%%%%%%%%%
@@ -103,7 +102,7 @@ constraint
     ( S[i] == 1 -> (x[nthForwardActivity(i)] == 1 \/ x[nthBackwardActivity(i)] == 1) )
     /\
     ( (x[nthForwardActivity(i)] == 1 \/ x[nthBackwardActivity(i)] == 1) -> S[i] == 1 )
-);
+); % Need both implications to make it an equivalence
 
 % Don't select forward activity if the request doesn't have one
 % TODO - Check if we really need this one
@@ -116,6 +115,28 @@ constraint
 constraint
   forall(i in 1..R)
     (endLocation[i] == -1 -> x[nthBackwardActivity(i)] == 0);
+    
+    
+% Patients must be at their destinations within certain time windows
+% equation 14 in the literature
+constraint
+  forall(i in 1..R)(
+    ( (0 <= s[nthForwardActivity(i)]) /\ (s[nthForwardActivity(i)] <= (rdvTime[i] - maxWaitTime) ) )
+    /\
+    ( ( (rdvTime[i] + rdvDuration + maxWaitTime) <= s[nthBackwardActivity(i)]) /\ (s[nthBackwardActivity(i)] <= timeHorizon) )
+);
+    
+% TODO - see if there is a change in performance by combining the e[] domain constraint
+% and the s[] equivalent; Or see if the pruning improves by making it a unary constraint
+% equation 14 in the literature
+constraint
+  forall(i in 1..R)(
+    % Restrict domain for end of forward activities
+    ( (0 <= e[nthForwardActivity(i)]) /\ (e[nthForwardActivity(i)] <= (rdvTime[i] - maxWaitTime)) )
+    /\
+    % Restrict domain for end of backward activities
+    ( ( (rdvTime[i] + rdvDuration + maxWaitTime) <= e[nthBackwardActivity(i)]) /\ (e[nthBackwardActivity(i)] <= timeHorizon) )
+);  
     
     
 % Instances restricting forward and backward activities to have the same vehicle
