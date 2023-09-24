@@ -35,6 +35,7 @@ array[1..R] of categories: patientCategory; % category of the patient of the ith
 
 array[1..R] of int: rdvTime; % rdvTime[i] = starting time of appointment for request i. (ui in the literature)
 array[1..R] of int: rdvDuration; % duration of the ith request's appointment. (di in the literature)
+array[1..R] of int: srv; % embark/disembark time of the ith patient to a vehicle
 array[1..R] of int: startLocation;
 array[1..R] of int: destination;
 array[1..R] of int: endLocation;
@@ -177,20 +178,19 @@ constraint
 constraint
   forall(i in 1..numActivities, j in i+1..numActivities)(
     if v[i] != 0 /\ v[j] != 0 then % if vehicles were selected for the activities
-      (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[activityStartLocation(i), activityStartLocation(j)])
-                      \/ ( s[i] - s[j] >= distMatrix[activityStartLocation(j), activityStartLocation(i)]) )
+      (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[activityStartLocation(i), activityStartLocation(j)] + srv[i])
+                      \/ ( s[i] - s[j] >= distMatrix[activityStartLocation(j), activityStartLocation(i)] + srv[j]) )
       /\
       (v[i] == v[j]) -> ( (s[j] - e[i] >= distMatrix[activityStartLocation(i), activityEndLocation(j)]) 
-                      \/ ( e[i] - s[j] >= distMatrix[activityStartLocation(j), activityEndLocation(i)]) )
+                      \/ ( e[i] - s[j] >= distMatrix[activityStartLocation(j), activityEndLocation(i)] + srv[j] + srv[i]) )
       /\
-      (v[i] == v[j]) -> ( (e[j] - s[i] >= distMatrix[activityEndLocation(i), activityStartLocation(j)]) 
+      (v[i] == v[j]) -> ( (e[j] - s[i] >= distMatrix[activityEndLocation(i), activityStartLocation(j)] + srv[i] + srv[j]) 
                       \/ ( s[i] - e[j] >= distMatrix[activityEndLocation(j), activityStartLocation(i)]) )
       /\
-      (v[i] == v[j]) -> ( (e[j] - e[i] >= distMatrix[activityEndLocation(i), activityEndLocation(j)]) 
-                      \/ ( e[i] - e[j] >= distMatrix[activityEndLocation(j), activityEndLocation(i)]) )
+      (v[i] == v[j]) -> ( (e[j] - e[i] >= distMatrix[activityEndLocation(i), activityEndLocation(j)] + srv[j]) 
+                      \/ ( e[i] - e[j] >= distMatrix[activityEndLocation(j), activityEndLocation(i)] + srv[i]) )
     endif
 ); % TODO - How to handle non-existent forward/backward activities??? (Maybe the if is enough to cover that)
-% TODO - need to take into account embark time (ver email do David)
 
 
 % (Intra-Activity Time Travel Consistency) Equation 7 in the literature
