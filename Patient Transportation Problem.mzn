@@ -39,6 +39,7 @@ array[1..R] of int: srv; % embark/disembark time of the ith patient to a vehicle
 array[1..R] of int: startLocation;
 array[1..R] of int: destination;
 array[1..R] of int: endLocation;
+array[1..R] of int: load; % number of places taken by patient i in the vehicle (l[i] in the literature)
 
 int: timeHorizon;
 
@@ -156,7 +157,8 @@ constraint
   
 
 % If an activity isn't selected, the values for the assigned vehicle,
-% starting time and end time should be absent
+% starting time and end time should reflect that 
+% We chose to assign them the lowest possible value
 constraint
   forall(i in 1..numActivities)(
     ( (x[i] == 0) -> (v[i] = 0) )
