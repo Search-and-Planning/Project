@@ -215,7 +215,30 @@ constraint
 constraint
   forall(i in 1..numActivities)
     (duration(i) <= -100); % TODO - take care of the placeholder value
-    
+
+
+% (Cumulative Resource) Equation 9 in the literature
+% At any moment, the number of places occupied by patients
+% in a same vehicle j cannot exceed its capacity (capacity[j])
+constraint
+  forall(j in 1..numVehicles)( % For each vehicle
+    cumulative(
+    [s[i] * bool2int(j == v[i])| i in 1..numActivities], % starting times for activities assigned to vehicle j
+    [duration(i) * bool2int(j == v[i])| i in 1..numActivities],
+    [load[i] * bool2int(j == v[i])| i in 1..numActivities], % resource consumption of those activities
+    capacity[j]
+    )
+);
+% Note: MiniZinc's implementation for the Cumulative Global Constraint requires
+% index_set(s[]) = index_set(duration[]) = index_set(load[]). Since we wanted to iterate
+% over the capacity of each vehicle, we had to "trim down" those three arrays
+% (to avoid restricting vehicles with capacities and/or activities that don't belong to them).
+% MiniZinc 2.7.6 (version used) can't figure out the size of variable length arrays
+% (our case, because the tasks assigned per vehicle vary), turning them all into
+% array[int] of var opt int (which the Cumulative Global Constraint can't handle), 
+% so the solution was to create fixed size arrays and pad them with 0s for 
+% the activities not assigned to vehicle j
+
     
 % maxWaitTime constraint? Ver enunciado
 
