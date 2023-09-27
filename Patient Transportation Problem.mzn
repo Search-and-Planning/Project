@@ -264,5 +264,9 @@ constraint
 %%%%%%%%%%%%
 %%% Goal %%%
 %%%%%%%%%%%%
+% TODO - Experimentar substituir pelas equações 11 e/ou 12 ou fazer uma conjunção das 3
 
-solve maximize sum(i in 1..R)(S[i]); % TODO - Experimentar substituir pelas equações 11 e/ou 12 ou fazer uma conjunção das 3
+solve maximize sum(i in 1..R)(S[i]) ::bool_search(S, first_fail, indomain_max); 
+
+% indomain_max on the values of S[] because we hope to try to satisfy as many
+% requests as possible
