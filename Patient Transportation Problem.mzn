@@ -24,15 +24,22 @@ set of 1..numPatientCategories: categories;
 par int: R; % Number of requests
 int: numActivities = 2 * R; % Request = Forward Activity + Backwards Activity
 
-%array[1..numVehicles] of record(int: capacity, set of categories: compatiblePatients): vehicle;
+array[1..numPlaces, 1..numPlaces] of int: distMatrix; % TODO - Do we need to replace int by float?
+int: timeHorizon;
+
+%%% Vehicle Parameters %%%
+
+array[1..numVehicles] of int: vehicleStartLocation; % Starting position of each vehicle
+array[1..numVehicles] of int: vehicleEndLocation; % Final location of each vehicle after shift has ended
+array[1..numVehicles] of int: vehicleStartTime; % Starting time of each vehicle's shift
+array[1..numVehicles] of int: vehicleEndTime; % End of each vehicle's shift
 array[1..numVehicles] of int: capacity;
 array[1..numVehicles] of set of categories: compatiblePatients;
 
-array[1..numPlaces, 1..numPlaces] of int: distMatrix; % TODO - Do we need to replace int by float?
+
+%%% Patient/Request parameters %%%
 
 array[1..R] of categories: patientCategory; % category of the patient of the ith request
-
-
 array[1..R] of int: rdvTime; % rdvTime[i] = starting time of appointment for request i. (ui in the literature)
 array[1..R] of int: rdvDuration; % duration of the ith request's appointment. (di in the literature)
 array[1..R] of int: srv; % embark/disembark time of the ith patient to a vehicle
@@ -41,26 +48,22 @@ array[1..R] of int: destination;
 array[1..R] of int: endLocation;
 array[1..R] of int: load; % number of places taken by patient i in the vehicle (l[i] in the literature)
 
-int: timeHorizon;
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 %%% Decision Variables %%%
 %%%%%%%%%%%%%%%%%%%%%%%%%%
 
-% Activity Variables %
+%%% Activity Variables %%%
 
-%array[1..numActivities] of var 0..maxTime-maxWaitTime: s; % placeholder for the domain
-%array[1..numActivities] of var min..max: e; % placeholders for the domain
 array[1..numActivities] of var 0..timeHorizon: s;
 array[1..numActivities] of var 0..timeHorizon: e;
-
 
 % v[i] is the vehicle assigned to activity i
 % 0 represents that no vehicle was selected
 array[1..numActivities] of var 0..numVehicles: v;
 array[1..numActivities] of var bool: x;
 
-% Request Variable %
+%%% Request Variable %%%
 array[1..R] of var bool: S; % S[i] = 1 if request i is selected, 0 otherwise
 
 
@@ -170,10 +173,10 @@ constraint
 
 
 % Patients can only be taken by some vehicle categories
+% TODO - split into two constraints and see if propagation improves
 constraint
   forall(i in 1..R)(
     if v[nthForwardActivity(i)] != 0 then
-      % Used let and in keywords to handle var opt type of v[]
       patientCategory[i] in compatiblePatients[v[nthForwardActivity(i)]]
     endif
     /\
@@ -212,6 +215,7 @@ constraint
 
 % (Maximum Travel Time) Equation 8 in the literature
 % Prevents situations where a patient stays too long in a vehicle
+% TODO - review this
 constraint
   forall(i in 1..numActivities)
     (duration(i) <= -100); % TODO - take care of the placeholder value
@@ -238,6 +242,20 @@ constraint
 % array[int] of var opt int (which the Cumulative Global Constraint can't handle), 
 % so the solution was to create fixed size arrays and pad them with 0s for 
 % the activities not assigned to vehicle j
+
+
+% (Vehicle Availability) Equation 15 in the literature
+% Vehicles have intervals where they are available to handle requests and
+% those time windows may be non continuous
+constraint
+  forall(i in 1..numActivities)(
+    if x[i] != 0 then
+      s[i] >= vehicleStartTime[v[i]] + distMatrix[vehicleStartLocation[v[i]], activityStartLocation(i)]
+      /\
+      e[i] <= vehicleEndTime[v[i]] - distMatrix[activityEndLocation(i), vehicleEndLocation[v[i]]]
+    endif
+); % TODO - handle non continuous intervals
+% TODO - should this take into account embark time?
 
     
 % maxWaitTime constraint? Ver enunciado
