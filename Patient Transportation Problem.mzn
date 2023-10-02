@@ -213,14 +213,6 @@ constraint
     (duration(i) >= distMatrix[activityStartLocation(i), activityEndLocation(i)]);
     
 
-% (Maximum Travel Time) Equation 8 in the literature
-% Prevents situations where a patient stays too long in a vehicle
-% TODO - review this
-constraint
-  forall(i in 1..numActivities)
-    (duration(i) <= -100); % TODO - take care of the placeholder value
-
-
 % (Cumulative Resource) Equation 9 in the literature
 % At any moment, the number of places occupied by patients
 % in a same vehicle j cannot exceed its capacity (capacity[j])
@@ -254,11 +246,8 @@ constraint
       /\
       e[i] <= vehicleEndTime[v[i]] - distMatrix[activityEndLocation(i), vehicleEndLocation[v[i]]]
     endif
-); % TODO - handle non continuous intervals
+);
 % TODO - should this take into account embark time?
-
-    
-% maxWaitTime constraint? Ver enunciado
 
 
 %%%%%%%%%%%%
@@ -266,7 +255,15 @@ constraint
 %%%%%%%%%%%%
 % TODO - Experimentar substituir pelas equações 11 e/ou 12 ou fazer uma conjunção das 3
 
-solve maximize sum(i in 1..R)(S[i]) ::bool_search(S, first_fail, indomain_max); 
+solve maximize sum(i in 1..R)(S[i]) ::bool_search(S, first_fail, indomain_max)
+          ::int_search(s, first_fail, indomain_min) % try replacing first_fail with most_constrained?
+          ::int_search(e, first_fail, indomain_min) % try replacing first_fail with most_constrained?
+          ::int_search(v, first_fail, indomain_random) % try replacing first_fail with most_constrained?
+;
 
 % indomain_max on the values of S[] because we hope to try to satisfy as many
 % requests as possible
+
+% Values for start and end times are picked with a indomain_min heuristic to try and
+% explore parts of the search space where we may "have time" to select multiple
+% requests
