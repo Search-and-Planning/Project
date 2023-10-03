@@ -1,8 +1,16 @@
 import json
 import sys
 from itertools import count as count
+from minizinc import Instance, Model, Solver
 
 # TODO - Output
+
+
+###################################
+###                             ###
+###     Auxiliary Classes       ###
+###                             ###
+###################################
 
 
 class Vehicle:
@@ -81,6 +89,12 @@ class Patient:
         "rdvDuration: " + str(self.rdvDuration) + \
         "srvDuration: " + str(self.srvDuration)
 
+
+###################################
+###                             ###
+###     Auxiliary Functions     ###
+###                             ###
+###################################
         
 
 def time_to_minutes(time: str) -> int:
@@ -94,6 +108,46 @@ def flatten(l: list) -> list:
     """Flattens a list of sets into a single list"""
 
     return [item for subset in l for item in subset]
+
+
+def assign_instance_parameters(instance, r, capacity, categories, compatiblePatients,
+                            destination, distMatrix, endLocation, load, maxWaitTime,
+                            numPatientCategories, numPlaces, numVehicles, patientCategory,
+                            rdvDuration, rdvTime, srv, sameVehicleBackwards,
+                            startLocation, timeHorizon, vehicleEndLocation, vehicleEndTime,
+                            vehicleStartLocation, vehicleStartTime,):
+    """Assigns the instance parameters to the minizinc instance"""
+
+    instance["R"] = r
+    instance["capacity"] = capacity
+    instance["categories"] = categories
+    instance["compatiblePatients"] = compatiblePatients
+    instance["destination"] = destination
+    instance["distMatrix"] = distMatrix
+    instance["endLocation"] = endLocation
+    instance["load"] = load
+    instance["maxWaitTime"] = maxWaitTime
+    instance["numPatientCategories"] = numPatientCategories
+    instance["numPlaces"] = numPlaces
+    instance["numVehicles"] = numVehicles
+    instance["patientCategory"] = patientCategory
+    instance["rdvDuration"] = rdvDuration
+    instance["rdvTime"] = rdvTime
+    instance["srv"] = srv
+    instance["sameVehicleBackwards"] = sameVehicleBackwards
+    instance["startLocation"] = startLocation
+    instance["timeHorizon"] = timeHorizon
+    instance["vehicleEndLocation"] = vehicleEndLocation
+    instance["vehicleEndTime"] = vehicleEndTime
+    instance["vehicleStartLocation"] = vehicleStartLocation
+    instance["vehicleStartTime"] = vehicleStartTime
+
+
+###################################
+###                             ###
+###   Main Function Execution   ###
+###                             ###
+###################################
 
 
 if __name__ == "__main__":
@@ -206,6 +260,34 @@ if __name__ == "__main__":
     ###   Call Minizinc Model    ####
     ###                          ####
     #################################
+
+    # Load PTP model from file
+    patientTransportation = Model("./PatientTransportationProblem.mzn")
+
+    # Get a solver
+    solver = Solver.lookup("gecode")
+
+    # Create an Instance of the PTP model for the solver to solve
+    instance = Instance(solver, patientTransportation)
+
+    # Assign instance parameters
+    assign_instance_parameters(instance, numRequests, capacity, categories, categories,
+                            destination, adjMatrix, end, load, maxWaitTime,
+                            len(flattenedCategories), numPlaces, numVehicles, patientCategory,
+                            appDuration, appStart, embarkDuration, sameVehicleBackwards,
+                            start, timeHorizon, vehicleEndLocation, vehicleEndTime,
+                            vehicleStartLocation, vehicleStartTime,)
+    
+    # Solve the instance
+    result = instance.solve()
+
+    
+    #################################
+    ###                          ####
+    ###   Process Output Json    ####
+    ###                          ####
+    #################################
+
 
 
     # Do stuff
