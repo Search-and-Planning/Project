@@ -16,11 +16,13 @@ include "cumulative.mzn";
 
 par int: numVehicles;
 par int: numPlaces;
-par int: numPatientCategories;
+%par int: numPatientCategories;
 par bool: sameVehicleBackwards;
 par int: maxWaitTime;
 
-set of 1..numPatientCategories: categories;
+%set of 1..numPatientCategories: categories;
+par int: minCategory;
+par int: maxCategory;
 par int: R; % Number of requests
 int: numActivities = 2 * R; % Request = Forward Activity + Backwards Activity
 
@@ -34,12 +36,12 @@ array[1..numVehicles] of int: vehicleEndLocation; % Final location of each vehic
 array[1..numVehicles] of int: vehicleStartTime; % Starting time of each vehicle's shift
 array[1..numVehicles] of int: vehicleEndTime; % End of each vehicle's shift
 array[1..numVehicles] of int: capacity;
-array[1..numVehicles] of set of categories: compatiblePatients;
+array[1..numVehicles] of set of minCategory..maxCategory: compatiblePatients;
 
 
 %%% Patient/Request parameters %%%
 
-array[1..R] of categories: patientCategory; % category of the patient of the ith request
+array[1..R] of minCategory..maxCategory: patientCategory; % category of the patient of the ith request
 array[1..R] of int: rdvTime; % rdvTime[i] = starting time of appointment for request i. (ui in the literature)
 array[1..R] of int: rdvDuration; % duration of the ith request's appointment. (di in the literature)
 array[1..R] of int: srv; % embark/disembark time of the ith patient to a vehicle
@@ -79,23 +81,24 @@ function int: nthBackwardActivity(int: n) = 2 * n;
 
 function int: activityStartLocation(int: n) = 
   if (n mod 2) == 1 then
-    startLocation[n mod 2] % Forward activity
+    startLocation[(n div 2) + 1] % Forward activity
   else
-    destination[n mod 2] % Backward Activity
+    destination[n div 2] % Backward Activity
   endif;
   
 function int: activityEndLocation(int: n) =
   if (n mod 2) == 1 then
-    destination[n mod 2] % Forward activity
+    destination[(n div 2) + 1] % Forward activity
   else
-    endLocation[n mod 2] % Backward Activity
+    endLocation[n div 2] % Backward Activity
   endif;
-  
+
+% TODO - review indices on the else branch
 function int: activityTimeLowerBound(int: n) =
   if (n mod 2) == 1 then
     0 % Forward activity
   else
-    rdvTime[n] + rdvDuration[n] + maxWaitTime % Backward Activity
+    rdvTime[(n - 1) mod 2] + rdvDuration[(n - 1) mod 2] + maxWaitTime % Backward Activity
   endif;
 
 function var int: duration(int: activity) = e[activity] - s[activity];

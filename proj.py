@@ -112,10 +112,10 @@ def flatten(l: list) -> list:
 
 def assign_instance_parameters(instance, r, capacity, categories, compatiblePatients,
                             destination, distMatrix, endLocation, load, maxWaitTime,
-                            numPatientCategories, numPlaces, numVehicles, patientCategory,
+                            minCategory, maxCategory, numPlaces, numVehicles, patientCategory,
                             rdvDuration, rdvTime, srv, sameVehicleBackwards,
                             startLocation, timeHorizon, vehicleEndLocation, vehicleEndTime,
-                            vehicleStartLocation, vehicleStartTime,):
+                            vehicleStartLocation, vehicleStartTime):
     """Assigns the instance parameters to the minizinc instance"""
 
     instance["R"] = r
@@ -127,7 +127,8 @@ def assign_instance_parameters(instance, r, capacity, categories, compatiblePati
     instance["endLocation"] = endLocation
     instance["load"] = load
     instance["maxWaitTime"] = maxWaitTime
-    instance["numPatientCategories"] = numPatientCategories
+    instance["minCategory"] = minCategory
+    instance["maxCategory"] = maxCategory
     instance["numPlaces"] = numPlaces
     instance["numVehicles"] = numVehicles
     instance["patientCategory"] = patientCategory
@@ -141,6 +142,48 @@ def assign_instance_parameters(instance, r, capacity, categories, compatiblePati
     instance["vehicleEndTime"] = vehicleEndTime
     instance["vehicleStartLocation"] = vehicleStartLocation
     instance["vehicleStartTime"] = vehicleStartTime
+
+
+def print_instance_parameters(r, capacity, categories, compatiblePatients,
+                            destination, distMatrix, endLocation, load, maxWaitTime,
+                            minCategory, maxCategory, numPlaces, numVehicles, patientCategory,
+                            rdvDuration, rdvTime, srv, sameVehicleBackwards,
+                            startLocation, timeHorizon, vehicleEndLocation, vehicleEndTime,
+                            vehicleStartLocation, vehicleStartTime):
+    """Prints the instance parameters"""
+    # print("R: ", r)
+    # print("capacity: ", capacity)
+    # print("categories: ", categories)
+    # print("compatiblePatients: ", compatiblePatients)
+    # print("destination: ", destination)
+    # print("distMatrix: ", distMatrix)
+    # print("endLocation: ", endLocation)
+    # print("load: ", load)
+    # print("maxWaitTime: ", maxWaitTime)
+    # print("minCategory: ", minCategory)
+    # print("maxCategory: ", maxCategory)
+    # print("numPlaces: ", numPlaces)
+    # print("numVehicles: ", numVehicles)
+    # print("patientCategory: ", patientCategory)
+    print("rdvDuration: ", rdvDuration)
+    print("rdvTime: ", rdvTime)
+    # print("srv: ", srv)
+    # print("sameVehicleBackwards: ", sameVehicleBackwards)
+    # print("startLocation: ", startLocation)
+    # print("timeHorizon: ", timeHorizon)
+    # print("vehicleEndLocation: ", vehicleEndLocation)
+    # print("vehicleEndTime: ", vehicleEndTime)
+    # print("vehicleStartLocation: ", vehicleStartLocation)
+    # print("vehicleStartTime: ", vehicleStartTime)
+
+
+def increment_matrix(matrix):
+    """Increments all values in a matrix by 1"""
+
+    for i in range(len(matrix)):
+        for j in range(len(matrix[i])):
+            matrix[i][j] += 1
+
 
 
 ###################################
@@ -169,7 +212,7 @@ if __name__ == "__main__":
 
 
     ### Instance specific constraints ###
-    sameVehicleBackwards = data["sameVehicleBackwards"] # Boolean
+    sameVehicleBackwards = data["sameVehicleBackward"] # Boolean
     maxWaitTime = time_to_minutes(data["maxWaitTime"]) # Integer
 
     ### Instance specific structure ###
@@ -184,17 +227,18 @@ if __name__ == "__main__":
     vehicleEndLocation = []
     capacity = []
     categories = []
+    flattenedCategories = []
     vehicleStartTime = []
     vehicleEndTime = []
     timeHorizon = 0
     numVehicles = 0
     for vehicle in data["vehicles"]:
         numVehicles += 1
-        availabilities = vehicle["availabilities"]
+        availabilities = vehicle["availability"]
 
         for availability in availabilities:
             # Handle vehicles with multiple availabilities
-            tempVar = availability['availability'].split(':')
+            tempVar = availability.split(':')
             startTime = time_to_minutes(tempVar[0])
             endTime = time_to_minutes(tempVar[1])
             if (endTime > timeHorizon):
@@ -204,13 +248,13 @@ if __name__ == "__main__":
             vehicleEndLocation.append(vehicle["end"])
             capacity.append(vehicle["capacity"])
             categories.append(set(vehicle["canTake"]))
+            flattenedCategories += [i for i in vehicle["canTake"] if not i in flattenedCategories]
             vehicleStartTime.append(startTime)
             vehicleEndTime.append(endTime)
 
             vehicles.append(Vehicle(vehicle["id"], startTime, endTime, vehicle["start"], 
                                     vehicle["end"], vehicle["canTake"],
                                     vehicle["capacity"]))
-    flattenedCategories = flatten(categories)
 
 
     start = []
@@ -231,7 +275,7 @@ if __name__ == "__main__":
         c = patient["category"]
         appStart = time_to_minutes(patient["rdvTime"])
         appDuration = time_to_minutes(patient["rdvDuration"])
-        embar = time_to_minutes(patient("srvDuration"))
+        embar = time_to_minutes(patient["srvDuration"])
         if (s == -1):
             # No forward activity for this request
             s = d
@@ -253,6 +297,7 @@ if __name__ == "__main__":
         numRequests += 1
 
     adjMatrix = data["distMatrix"]
+    #increment_matrix(adjMatrix)
 
 
     #################################
@@ -273,13 +318,21 @@ if __name__ == "__main__":
     # Assign instance parameters
     assign_instance_parameters(instance, numRequests, capacity, categories, categories,
                             destination, adjMatrix, end, load, maxWaitTime,
-                            len(flattenedCategories), numPlaces, numVehicles, patientCategory,
-                            appDuration, appStart, embarkDuration, sameVehicleBackwards,
+                            min(flattenedCategories), max(flattenedCategories), numPlaces, numVehicles, patientCategory,
+                            appointmentDuration, appointmentStart, embarkDuration, sameVehicleBackwards,
                             start, timeHorizon, vehicleEndLocation, vehicleEndTime,
-                            vehicleStartLocation, vehicleStartTime,)
+                            vehicleStartLocation, vehicleStartTime)
     
     # Solve the instance
+    print_instance_parameters(numRequests, capacity, categories, categories,
+                            destination, adjMatrix, end, load, maxWaitTime,
+                            min(flattenedCategories), max(flattenedCategories), numPlaces, numVehicles, patientCategory,
+                            appointmentDuration, appointmentStart, embarkDuration, sameVehicleBackwards,
+                            start, timeHorizon, vehicleEndLocation, vehicleEndTime,
+                            vehicleStartLocation, vehicleStartTime)
+    print("Solving...")
     result = instance.solve()
+    print("Search Complete!")
 
     
     #################################
