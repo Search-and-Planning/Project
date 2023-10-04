@@ -156,25 +156,32 @@ def print_instance_parameters(r, capacity, categories, compatiblePatients,
     # print("categories: ", categories)
     # print("compatiblePatients: ", compatiblePatients)
     # print("destination: ", destination)
+    #print("0 in destination: ", 0 in destination)
     # print("distMatrix: ", distMatrix)
     # print("endLocation: ", endLocation)
-    # print("load: ", load)
+    #print("0 in endLocation: ", 0 in endLocation)
+    print("load: ", load)
     # print("maxWaitTime: ", maxWaitTime)
     # print("minCategory: ", minCategory)
     # print("maxCategory: ", maxCategory)
     # print("numPlaces: ", numPlaces)
     # print("numVehicles: ", numVehicles)
     # print("patientCategory: ", patientCategory)
-    print("rdvDuration: ", rdvDuration)
-    print("rdvTime: ", rdvTime)
+    #print("rdvDuration: ", rdvDuration)
+    #print("rdvTime: ", rdvTime)
     # print("srv: ", srv)
     # print("sameVehicleBackwards: ", sameVehicleBackwards)
-    # print("startLocation: ", startLocation)
+    #print("startLocation: ", startLocation)
+    #print("0 in startLocation: ", 0 in startLocation)
     # print("timeHorizon: ", timeHorizon)
     # print("vehicleEndLocation: ", vehicleEndLocation)
     # print("vehicleEndTime: ", vehicleEndTime)
     # print("vehicleStartLocation: ", vehicleStartLocation)
     # print("vehicleStartTime: ", vehicleStartTime)
+    for i in load:
+        if i <= 0:
+            print(i)
+
 
 
 def increment_matrix(matrix):
@@ -244,8 +251,8 @@ if __name__ == "__main__":
             if (endTime > timeHorizon):
                 timeHorizon = endTime
 
-            vehicleStartLocation.append(vehicle["start"])
-            vehicleEndLocation.append(vehicle["end"])
+            vehicleStartLocation.append(vehicle["start"] + 1)
+            vehicleEndLocation.append(vehicle["end"] + 1)
             capacity.append(vehicle["capacity"])
             categories.append(set(vehicle["canTake"]))
             flattenedCategories += [i for i in vehicle["canTake"] if not i in flattenedCategories]
@@ -284,9 +291,9 @@ if __name__ == "__main__":
             e = d
         if (not c in flattenedCategories):
             flattenedCategories.append(c)
-        start.append(s)
-        destination.append(d)
-        end.append(e)
+        start.append(s + 1) # minizinc model starts at 1
+        destination.append(d + 1)
+        end.append(e + 1)
         appointmentStart.append(appStart)
         appointmentDuration.append(appDuration)
         embarkDuration.append(embar)
@@ -333,6 +340,7 @@ if __name__ == "__main__":
     print("Solving...")
     result = instance.solve()
     print("Search Complete!")
+    print("result:", result)
 
     
     #################################

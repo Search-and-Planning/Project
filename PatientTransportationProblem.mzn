@@ -16,11 +16,8 @@ include "cumulative.mzn";
 
 par int: numVehicles;
 par int: numPlaces;
-%par int: numPatientCategories;
 par bool: sameVehicleBackwards;
 par int: maxWaitTime;
-
-%set of 1..numPatientCategories: categories;
 par int: minCategory;
 par int: maxCategory;
 par int: R; % Number of requests
@@ -74,10 +71,18 @@ array[1..R] of var bool: S; % S[i] = 1 if request i is selected, 0 otherwise
 %%%    and     %%%
 %%% Predicates %%%
 %%%%%%%%%%%%%%%%%%
-
+% TODO - review computation (acho que está bem)
 function int: nthForwardActivity(int: n) = (2 * n) - 1;
 
+% TODO - review computation (acho que está bem)
 function int: nthBackwardActivity(int: n) = 2 * n;
+
+function int: activityToRequest(int: n) = 
+  if (n mod 2) == 1 then
+    (n div 2) + 1 % Forward activity
+  else
+    n div 2 % Backward Activity
+  endif;
 
 function int: activityStartLocation(int: n) = 
   if (n mod 2) == 1 then
@@ -93,12 +98,12 @@ function int: activityEndLocation(int: n) =
     endLocation[n div 2] % Backward Activity
   endif;
 
-% TODO - review indices on the else branch
+% TODO - review indices on the else branch (Should be good now?)
 function int: activityTimeLowerBound(int: n) =
   if (n mod 2) == 1 then
     0 % Forward activity
   else
-    rdvTime[(n - 1) mod 2] + rdvDuration[(n - 1) mod 2] + maxWaitTime % Backward Activity
+    rdvTime[n div 2] + rdvDuration[n div 2] + maxWaitTime % Backward Activity
   endif;
 
 function var int: duration(int: activity) = e[activity] - s[activity];
@@ -151,7 +156,14 @@ constraint
     /\
     % Restrict domain for end of backward activities
     ( ( (rdvTime[i] + rdvDuration[i] + maxWaitTime) <= e[nthBackwardActivity(i)]) /\ (e[nthBackwardActivity(i)] <= timeHorizon) )
-);  
+);
+
+
+%TODO - just testing. Maybe will delete this one
+constraint
+  forall(i in 1..numActivities)(
+    (s[i] <= e[i])
+);
     
     
 % Instances restricting forward and backward activities to have the same vehicle
@@ -171,6 +183,7 @@ constraint
     /\
     ( (x[i] == 0) -> (s[i] = 0) )
     /\
+    %( (x[i] == 0) -> (e[i] = activityTimeLowerBound(i)) )
     ( (x[i] == 0) -> (e[i] = activityTimeLowerBound(i)) )
 );
 
@@ -193,17 +206,17 @@ constraint
 constraint
   forall(i in 1..numActivities, j in i+1..numActivities)(
     if v[i] != 0 /\ v[j] != 0 then % if vehicles were selected for the activities
-      (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[activityStartLocation(i), activityStartLocation(j)] + srv[i])
-                      \/ ( s[i] - s[j] >= distMatrix[activityStartLocation(j), activityStartLocation(i)] + srv[j]) )
+      (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[activityStartLocation(i), activityStartLocation(j)] + srv[activityToRequest(i)])
+                      \/ ( s[i] - s[j] >= distMatrix[activityStartLocation(j), activityStartLocation(i)] + srv[activityToRequest(j)]) )
       /\
       (v[i] == v[j]) -> ( (s[j] - e[i] >= distMatrix[activityStartLocation(i), activityEndLocation(j)]) 
-                      \/ ( e[i] - s[j] >= distMatrix[activityStartLocation(j), activityEndLocation(i)] + srv[j] + srv[i]) )
+                      \/ ( e[i] - s[j] >= distMatrix[activityStartLocation(j), activityEndLocation(i)] + srv[activityToRequest(j)] + srv[activityToRequest(i)]) )
       /\
-      (v[i] == v[j]) -> ( (e[j] - s[i] >= distMatrix[activityEndLocation(i), activityStartLocation(j)] + srv[i] + srv[j]) 
+      (v[i] == v[j]) -> ( (e[j] - s[i] >= distMatrix[activityEndLocation(i), activityStartLocation(j)] + srv[activityToRequest(i)] + srv[activityToRequest(j)]) 
                       \/ ( s[i] - e[j] >= distMatrix[activityEndLocation(j), activityStartLocation(i)]) )
       /\
-      (v[i] == v[j]) -> ( (e[j] - e[i] >= distMatrix[activityEndLocation(i), activityEndLocation(j)] + srv[j]) 
-                      \/ ( e[i] - e[j] >= distMatrix[activityEndLocation(j), activityEndLocation(i)] + srv[i]) )
+      (v[i] == v[j]) -> ( (e[j] - e[i] >= distMatrix[activityEndLocation(i), activityEndLocation(j)] + srv[activityToRequest(j)]) 
+                      \/ ( e[i] - e[j] >= distMatrix[activityEndLocation(j), activityEndLocation(i)] + srv[activityToRequest(i)]) )
     endif
 ); % TODO - How to handle non-existent forward/backward activities??? (Maybe the if is enough to cover that)
 
@@ -214,7 +227,15 @@ constraint
 constraint
   forall(i in 1..numActivities)
     (duration(i) >= distMatrix[activityStartLocation(i), activityEndLocation(i)]);
-    
+
+
+% Activity duration can't be negative
+% Redundant with Intra-Activity Time Travel Consistency constraint
+constraint
+  forall(i in 1..numActivities)(
+    e[i] >= s[i]
+);
+
 
 % (Cumulative Resource) Equation 9 in the literature
 % At any moment, the number of places occupied by patients
@@ -224,7 +245,7 @@ constraint
     cumulative(
     [s[i] * bool2int(j == v[i])| i in 1..numActivities], % starting times for activities assigned to vehicle j
     [duration(i) * bool2int(j == v[i])| i in 1..numActivities],
-    [load[i] * bool2int(j == v[i])| i in 1..numActivities], % resource consumption of those activities
+    [load[activityToRequest(i)] * bool2int(j == v[i])| i in 1..numActivities], % resource consumption of those activities
     capacity[j]
     )
 );
@@ -245,7 +266,7 @@ constraint
 constraint
   forall(i in 1..numActivities)(
     if x[i] != 0 then
-      s[i] >= vehicleStartTime[v[i]] + distMatrix[vehicleStartLocation[v[i]], activityStartLocation(i)]
+      s[i] >= vehicleStartTime[v[i]] + distMatrix[vehicleStartLocation[v[i]], activityStartLocation(i)] 
       /\
       e[i] <= vehicleEndTime[v[i]] - distMatrix[activityEndLocation(i), vehicleEndLocation[v[i]]]
     endif

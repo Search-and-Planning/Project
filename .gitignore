@@ -2,3 +2,5 @@ instances*
 easy
 hard
 medium
+output
+*.json
