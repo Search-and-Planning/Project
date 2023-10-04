@@ -2,6 +2,7 @@ import json
 import sys
 from itertools import count as count
 from minizinc import Instance, Model, Solver
+from time import sleep
 
 # TODO - Output
 
@@ -319,6 +320,7 @@ if __name__ == "__main__":
     # Get a solver
     solver = Solver.lookup("gecode")
 
+
     # Create an Instance of the PTP model for the solver to solve
     instance = Instance(solver, patientTransportation)
 
@@ -340,7 +342,13 @@ if __name__ == "__main__":
     print("Solving...")
     result = instance.solve()
     print("Search Complete!")
+    print("type(result):", type(result))
+    print("result.status:", result.status)
+    sleep(3)
     print("result:", result)
+    sleep(10)
+    print("result[0]:", result[0])
+    print("v:", result["v"])
 
     
     #################################

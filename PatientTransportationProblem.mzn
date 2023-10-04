@@ -135,6 +135,15 @@ constraint
 constraint
   forall(i in 1..R)
     (endLocation[i] == -1 -> x[nthBackwardActivity(i)] == 0);
+
+% If request has both kind of activities, they must either both be selected
+% or neither is selected
+% TODO - It is possible this constraint isn't required
+% constraint
+%   forall(i in 1..R)(
+%     (startLocation[i] != -1 /\ endLocation[i] != -1) -> 
+%     (x[nthForwardActivity(i)] == x[nthBackwardActivity(i)])
+% );
     
     
 % Patients must be at their destinations within certain time windows
@@ -157,21 +166,13 @@ constraint
     % Restrict domain for end of backward activities
     ( ( (rdvTime[i] + rdvDuration[i] + maxWaitTime) <= e[nthBackwardActivity(i)]) /\ (e[nthBackwardActivity(i)] <= timeHorizon) )
 );
-
-
-%TODO - just testing. Maybe will delete this one
-constraint
-  forall(i in 1..numActivities)(
-    (s[i] <= e[i])
-);
-    
+   
     
 % Instances restricting forward and backward activities to have the same vehicle
 constraint
-  if sameVehicleBackwards then
-    forall(i in 1..R)
-      (v[nthForwardActivity(i)] == v[nthBackwardActivity(i)])
-  endif;
+  sameVehicleBackwards -> forall(i in 1..R)(
+    v[nthForwardActivity(i)] == v[nthBackwardActivity(i)]
+);
   
 
 % If an activity isn't selected, the values for the assigned vehicle,
@@ -181,9 +182,9 @@ constraint
   forall(i in 1..numActivities)(
     ( (x[i] == 0) -> (v[i] = 0) )
     /\
-    ( (x[i] == 0) -> (s[i] = 0) )
+    %( (x[i] == 0) -> (s[i] = 0) )
+    ( (x[i] == 0) -> (s[i] = activityTimeLowerBound(i)) )
     /\
-    %( (x[i] == 0) -> (e[i] = activityTimeLowerBound(i)) )
     ( (x[i] == 0) -> (e[i] = activityTimeLowerBound(i)) )
 );
 
@@ -192,28 +193,30 @@ constraint
 % TODO - split into two constraints and see if propagation improves
 constraint
   forall(i in 1..R)(
-    if v[nthForwardActivity(i)] != 0 then
+    ((v[nthForwardActivity(i)] != 0) -> (
+      % if the forward activity is selected, the vehicle must be compatible with the patient
       patientCategory[i] in compatiblePatients[v[nthForwardActivity(i)]]
-    endif
+    ))
     /\
-    if v[nthBackwardActivity(i)] != 0 then
+    ((v[nthBackwardActivity(i)] != 0) -> (
+      % if the backward activity is selected, the vehicle must be compatible with the patient
       patientCategory[i] in compatiblePatients[v[nthBackwardActivity(i)]]
-    endif
+    ))
 ); % TODO - Try replacing the if condition by x[] != 0 and see if the inference improves or worsens
 
     
 % (Inter-Activity Time Travel Consistency) Equation 6 in the literature
 constraint
   forall(i in 1..numActivities, j in i+1..numActivities)(
-    if v[i] != 0 /\ v[j] != 0 then % if vehicles were selected for the activities
+    if v[i] != 0 then % if vehicles were selected for the activities
       (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[activityStartLocation(i), activityStartLocation(j)] + srv[activityToRequest(i)])
                       \/ ( s[i] - s[j] >= distMatrix[activityStartLocation(j), activityStartLocation(i)] + srv[activityToRequest(j)]) )
       /\
       (v[i] == v[j]) -> ( (s[j] - e[i] >= distMatrix[activityStartLocation(i), activityEndLocation(j)]) 
-                      \/ ( e[i] - s[j] >= distMatrix[activityStartLocation(j), activityEndLocation(i)] + srv[activityToRequest(j)] + srv[activityToRequest(i)]) )
+                      \/ ( e[i] - s[j] >= distMatrix[activityEndLocation(j), activityStartLocation(i)] + srv[activityToRequest(j)] + srv[activityToRequest(i)]) )
       /\
       (v[i] == v[j]) -> ( (e[j] - s[i] >= distMatrix[activityEndLocation(i), activityStartLocation(j)] + srv[activityToRequest(i)] + srv[activityToRequest(j)]) 
-                      \/ ( s[i] - e[j] >= distMatrix[activityEndLocation(j), activityStartLocation(i)]) )
+                      \/ ( s[i] - e[j] >= distMatrix[activityStartLocation(j), activityEndLocation(i)]) )
       /\
       (v[i] == v[j]) -> ( (e[j] - e[i] >= distMatrix[activityEndLocation(i), activityEndLocation(j)] + srv[activityToRequest(j)]) 
                       \/ ( e[i] - e[j] >= distMatrix[activityEndLocation(j), activityEndLocation(i)] + srv[activityToRequest(i)]) )
@@ -224,6 +227,7 @@ constraint
 % (Intra-Activity Time Travel Consistency) Equation 7 in the literature
 % The duration of each activity cannot be lesser than the time required 
 % to go from the origin to the destination
+% TODO - CHECK IF THIS IS CONSISTENT WITH THE MODEL
 constraint
   forall(i in 1..numActivities)
     (duration(i) >= distMatrix[activityStartLocation(i), activityEndLocation(i)]);
@@ -240,15 +244,15 @@ constraint
 % (Cumulative Resource) Equation 9 in the literature
 % At any moment, the number of places occupied by patients
 % in a same vehicle j cannot exceed its capacity (capacity[j])
-constraint
-  forall(j in 1..numVehicles)( % For each vehicle
-    cumulative(
-    [s[i] * bool2int(j == v[i])| i in 1..numActivities], % starting times for activities assigned to vehicle j
-    [duration(i) * bool2int(j == v[i])| i in 1..numActivities],
-    [load[activityToRequest(i)] * bool2int(j == v[i])| i in 1..numActivities], % resource consumption of those activities
-    capacity[j]
-    )
-);
+% constraint
+%   forall(j in 1..numVehicles)( % For each vehicle
+%     cumulative(
+%     [s[i] * bool2int(j == v[i])| i in 1..numActivities], % starting times for activities assigned to vehicle j
+%     [duration(i) * bool2int(j == v[i])| i in 1..numActivities],
+%     [load[activityToRequest(i)] * bool2int(j == v[i])| i in 1..numActivities], % resource consumption of those activities
+%     capacity[j]
+%     )
+% );
 % Note: MiniZinc's implementation for the Cumulative Global Constraint requires
 % index_set(s[]) = index_set(duration[]) = index_set(load[]). Since we wanted to iterate
 % over the capacity of each vehicle, we had to "trim down" those three arrays
@@ -263,14 +267,14 @@ constraint
 % (Vehicle Availability) Equation 15 in the literature
 % Vehicles have intervals where they are available to handle requests and
 % those time windows may be non continuous
-constraint
-  forall(i in 1..numActivities)(
-    if x[i] != 0 then
-      s[i] >= vehicleStartTime[v[i]] + distMatrix[vehicleStartLocation[v[i]], activityStartLocation(i)] 
-      /\
-      e[i] <= vehicleEndTime[v[i]] - distMatrix[activityEndLocation(i), vehicleEndLocation[v[i]]]
-    endif
-);
+% constraint
+%   forall(i in 1..numActivities)(
+%     x[i] -> (
+%       s[i] >= vehicleStartTime[v[i]] + distMatrix[vehicleStartLocation[v[i]], activityStartLocation(i)] 
+%       /\
+%       e[i] <= vehicleEndTime[v[i]] - distMatrix[activityEndLocation(i), vehicleEndLocation[v[i]]]
+%     )
+% );
 % TODO - should this take into account embark time?
 
 
@@ -278,6 +282,8 @@ constraint
 %%% Goal %%%
 %%%%%%%%%%%%
 % TODO - Experimentar substituir pelas equações 11 e/ou 12 ou fazer uma conjunção das 3
+
+% solve satisfy;
 
 solve maximize sum(i in 1..R)(S[i]) ::bool_search(S, first_fail, indomain_max)
           ::int_search(s, first_fail, indomain_min) % try replacing first_fail with most_constrained?
