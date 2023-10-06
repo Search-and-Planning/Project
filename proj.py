@@ -161,7 +161,7 @@ def print_instance_parameters(r, capacity, categories, compatiblePatients,
     # print("distMatrix: ", distMatrix)
     # print("endLocation: ", endLocation)
     #print("0 in endLocation: ", 0 in endLocation)
-    print("load: ", load)
+    #print("load: ", load)
     # print("maxWaitTime: ", maxWaitTime)
     # print("minCategory: ", minCategory)
     # print("maxCategory: ", maxCategory)

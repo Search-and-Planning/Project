@@ -56,6 +56,7 @@ array[1..R] of int: load; % number of places taken by patient i in the vehicle (
 
 array[1..numActivities] of var 0..timeHorizon: s;
 array[1..numActivities] of var 0..timeHorizon: e;
+array[1..numActivities] of var 0..maxWaitTime: d;
 
 % v[i] is the vehicle assigned to activity i
 % 0 represents that no vehicle was selected
@@ -106,7 +107,7 @@ function int: activityTimeLowerBound(int: n) =
     rdvTime[n div 2] + rdvDuration[n div 2] + maxWaitTime % Backward Activity
   endif;
 
-function var int: duration(int: activity) = e[activity] - s[activity];
+%function var int: duration(int: activity) = e[activity] - s[activity];
 
 %%%%%%%%%%%%%%%%%%%
 %%% Constraints %%%
@@ -115,8 +116,6 @@ function var int: duration(int: activity) = e[activity] - s[activity];
 % (Empty Locations) Equation 17 in the literature
 % Selecting a Request is equivalent to selecting the corresponding
 % forward or backward activity
-% TODO - still need to ensure that the activities that required both types (i think it's done?)
-% have them match
 constraint
   forall(i in 1..R)(
     ( S[i] == 1 -> (x[nthForwardActivity(i)] == 1 \/ x[nthBackwardActivity(i)] == 1) )
@@ -124,30 +123,28 @@ constraint
     ( (x[nthForwardActivity(i)] == 1 \/ x[nthBackwardActivity(i)] == 1) -> S[i] == 1 )
 ); % Need both implications to make it an equivalence
 
+
 % Don't select forward activity if the request doesn't have one
-% TODO - Check if we really need this one
 constraint
   forall(i in 1..R)
     (startLocation[i] == -1 -> x[nthForwardActivity(i)] == 0);
 
 % Don't select backward activity if the request doesn't have one
-% TODO - Check if we really need this one
 constraint
   forall(i in 1..R)
     (endLocation[i] == -1 -> x[nthBackwardActivity(i)] == 0);
 
 % If request has both kind of activities, they must either both be selected
 % or neither is selected
-% TODO - It is possible this constraint isn't required
 % constraint
 %   forall(i in 1..R)(
 %     (startLocation[i] != -1 /\ endLocation[i] != -1) -> 
 %     (x[nthForwardActivity(i)] == x[nthBackwardActivity(i)])
 % );
-    
+
     
 % Patients must be at their destinations within certain time windows
-% equation 14 in the literature
+% equation 14 in the literature (starting times)
 constraint
   forall(i in 1..R)(
     ( (0 <= s[nthForwardActivity(i)]) /\ (s[nthForwardActivity(i)] <= (rdvTime[i] - maxWaitTime) ) )
@@ -155,17 +152,17 @@ constraint
     ( ( (rdvTime[i] + rdvDuration[i] + maxWaitTime) <= s[nthBackwardActivity(i)]) /\ (s[nthBackwardActivity(i)] <= timeHorizon) )
 );
     
-% TODO - see if there is a change in performance by combining the e[] domain constraint
+
 % and the s[] equivalent; Or see if the pruning improves by making it a unary constraint
-% equation 14 in the literature
-constraint
-  forall(i in 1..R)(
-    % Restrict domain for end of forward activities
-    ( (0 <= e[nthForwardActivity(i)]) /\ (e[nthForwardActivity(i)] <= (rdvTime[i] - maxWaitTime)) )
-    /\
-    % Restrict domain for end of backward activities
-    ( ( (rdvTime[i] + rdvDuration[i] + maxWaitTime) <= e[nthBackwardActivity(i)]) /\ (e[nthBackwardActivity(i)] <= timeHorizon) )
-);
+% equation 14 in the literature (ending times)
+% constraint
+%   forall(i in 1..R)(
+%     % Restrict domain for end of forward activities
+%     ( (0 <= e[nthForwardActivity(i)]) /\ (e[nthForwardActivity(i)] <= (rdvTime[i] - maxWaitTime)) )
+%     /\
+%     % Restrict domain for end of backward activities
+%     ( ( (rdvTime[i] + rdvDuration[i] + maxWaitTime) <= e[nthBackwardActivity(i)]) /\ (e[nthBackwardActivity(i)] <= timeHorizon) )
+% );
    
     
 % Instances restricting forward and backward activities to have the same vehicle
@@ -180,12 +177,19 @@ constraint
 % We chose to assign them the lowest possible value
 constraint
   forall(i in 1..numActivities)(
-    ( (x[i] == 0) -> (v[i] = 0) )
+    ( (not x[i]) -> (v[i] = 0) )
     /\
-    %( (x[i] == 0) -> (s[i] = 0) )
-    ( (x[i] == 0) -> (s[i] = activityTimeLowerBound(i)) )
-    /\
-    ( (x[i] == 0) -> (e[i] = activityTimeLowerBound(i)) )
+    ( (v[i] == 0) -> (not x[i]) )
+    % /\
+    % ( (x[i] == 0) -> (s[i] = activityTimeLowerBound(i)) )
+    % /\
+    % ( (x[i] == 0) -> (e[i] = activityTimeLowerBound(i)) )
+);
+
+% If an activity was selected, a vehicle must be assigned to it
+constraint
+  forall(i in 1..numActivities)(
+    x[i] -> (v[i] != 0)
 );
 
 
@@ -221,16 +225,15 @@ constraint
       (v[i] == v[j]) -> ( (e[j] - e[i] >= distMatrix[activityEndLocation(i), activityEndLocation(j)] + srv[activityToRequest(j)]) 
                       \/ ( e[i] - e[j] >= distMatrix[activityEndLocation(j), activityEndLocation(i)] + srv[activityToRequest(i)]) )
     endif
-); % TODO - How to handle non-existent forward/backward activities??? (Maybe the if is enough to cover that)
+);
 
 
 % (Intra-Activity Time Travel Consistency) Equation 7 in the literature
 % The duration of each activity cannot be lesser than the time required 
 % to go from the origin to the destination
-% TODO - CHECK IF THIS IS CONSISTENT WITH THE MODEL
 constraint
   forall(i in 1..numActivities)
-    (duration(i) >= distMatrix[activityStartLocation(i), activityEndLocation(i)]);
+    (d[i] >= distMatrix[activityStartLocation(i), activityEndLocation(i)]);
 
 
 % Activity duration can't be negative
@@ -240,19 +243,25 @@ constraint
     e[i] >= s[i]
 );
 
+constraint 
+  forall(i in 1..numActivities)(
+    d[i] = (e[i] - s[i])
+);
 
 % (Cumulative Resource) Equation 9 in the literature
 % At any moment, the number of places occupied by patients
 % in a same vehicle j cannot exceed its capacity (capacity[j])
-% constraint
-%   forall(j in 1..numVehicles)( % For each vehicle
-%     cumulative(
-%     [s[i] * bool2int(j == v[i])| i in 1..numActivities], % starting times for activities assigned to vehicle j
-%     [duration(i) * bool2int(j == v[i])| i in 1..numActivities],
-%     [load[activityToRequest(i)] * bool2int(j == v[i])| i in 1..numActivities], % resource consumption of those activities
-%     capacity[j]
-%     )
-% );
+constraint
+  forall(j in 1..numVehicles)( % For each vehicle
+    cumulative(
+    [s[i] * bool2int(j == v[i])| i in 1..numActivities], % starting times for activities assigned to vehicle j
+    %[duration(i) * bool2int(j == v[i])| i in 1..numActivities],
+    [d[i] * bool2int(j == v[i])| i in 1..numActivities], % durations of those activities
+    %[1 | i in 1..numActivities],
+    [load[activityToRequest(i)] * bool2int(j == v[i])| i in 1..numActivities], % resource consumption of those activities
+    capacity[j]
+    )
+);
 % Note: MiniZinc's implementation for the Cumulative Global Constraint requires
 % index_set(s[]) = index_set(duration[]) = index_set(load[]). Since we wanted to iterate
 % over the capacity of each vehicle, we had to "trim down" those three arrays
