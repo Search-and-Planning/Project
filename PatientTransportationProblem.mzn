@@ -107,7 +107,7 @@ function int: activityTimeLowerBound(int: n) =
     rdvTime[n div 2] + rdvDuration[n div 2] + maxWaitTime % Backward Activity
   endif;
 
-%function var int: duration(int: activity) = e[activity] - s[activity];
+% function var 0..timeHorizon: duration(int: activity) = e[activity] - s[activity];
 
 %%%%%%%%%%%%%%%%%%%
 %%% Constraints %%%
@@ -136,11 +136,11 @@ constraint
 
 % If request has both kind of activities, they must either both be selected
 % or neither is selected
-% constraint
-%   forall(i in 1..R)(
-%     (startLocation[i] != -1 /\ endLocation[i] != -1) -> 
-%     (x[nthForwardActivity(i)] == x[nthBackwardActivity(i)])
-% );
+constraint
+  forall(i in 1..R)(
+    (startLocation[i] != -1 /\ endLocation[i] != -1) -> 
+    (x[nthForwardActivity(i)] == x[nthBackwardActivity(i)])
+);
 
     
 % Patients must be at their destinations within certain time windows
@@ -155,14 +155,14 @@ constraint
 
 % and the s[] equivalent; Or see if the pruning improves by making it a unary constraint
 % equation 14 in the literature (ending times)
-% constraint
-%   forall(i in 1..R)(
-%     % Restrict domain for end of forward activities
-%     ( (0 <= e[nthForwardActivity(i)]) /\ (e[nthForwardActivity(i)] <= (rdvTime[i] - maxWaitTime)) )
-%     /\
-%     % Restrict domain for end of backward activities
-%     ( ( (rdvTime[i] + rdvDuration[i] + maxWaitTime) <= e[nthBackwardActivity(i)]) /\ (e[nthBackwardActivity(i)] <= timeHorizon) )
-% );
+constraint
+  forall(i in 1..R)(
+    % Restrict domain for end of forward activities
+    ( (0 <= e[nthForwardActivity(i)]) /\ (e[nthForwardActivity(i)] <= (rdvTime[i] - maxWaitTime)) )
+    /\
+    % Restrict domain for end of backward activities
+    ( ( (rdvTime[i] + rdvDuration[i] + maxWaitTime) <= e[nthBackwardActivity(i)]) /\ (e[nthBackwardActivity(i)] <= timeHorizon) )
+);
    
     
 % Instances restricting forward and backward activities to have the same vehicle
@@ -180,10 +180,10 @@ constraint
     ( (not x[i]) -> (v[i] = 0) )
     /\
     ( (v[i] == 0) -> (not x[i]) )
-    % /\
-    % ( (x[i] == 0) -> (s[i] = activityTimeLowerBound(i)) )
-    % /\
-    % ( (x[i] == 0) -> (e[i] = activityTimeLowerBound(i)) )
+    /\
+    ( (not x[i]) -> (s[i] = activityTimeLowerBound(i)) )
+    /\
+    ( (not x[i]) -> (e[i] = activityTimeLowerBound(i)) )
 );
 
 % If an activity was selected, a vehicle must be assigned to it
@@ -234,14 +234,15 @@ constraint
 constraint
   forall(i in 1..numActivities)
     (d[i] >= distMatrix[activityStartLocation(i), activityEndLocation(i)]);
+    % (duration(i) >= distMatrix[activityStartLocation(i), activityEndLocation(i)]);
 
 
 % Activity duration can't be negative
 % Redundant with Intra-Activity Time Travel Consistency constraint
-constraint
-  forall(i in 1..numActivities)(
-    e[i] >= s[i]
-);
+% constraint
+%   forall(i in 1..numActivities)(
+%     e[i] >= s[i]
+% );
 
 constraint 
   forall(i in 1..numActivities)(
@@ -255,9 +256,8 @@ constraint
   forall(j in 1..numVehicles)( % For each vehicle
     cumulative(
     [s[i] * bool2int(j == v[i])| i in 1..numActivities], % starting times for activities assigned to vehicle j
-    %[duration(i) * bool2int(j == v[i])| i in 1..numActivities],
+    % [duration(i) * bool2int(j == v[i])| i in 1..numActivities],
     [d[i] * bool2int(j == v[i])| i in 1..numActivities], % durations of those activities
-    %[1 | i in 1..numActivities],
     [load[activityToRequest(i)] * bool2int(j == v[i])| i in 1..numActivities], % resource consumption of those activities
     capacity[j]
     )
@@ -276,14 +276,14 @@ constraint
 % (Vehicle Availability) Equation 15 in the literature
 % Vehicles have intervals where they are available to handle requests and
 % those time windows may be non continuous
-% constraint
-%   forall(i in 1..numActivities)(
-%     x[i] -> (
-%       s[i] >= vehicleStartTime[v[i]] + distMatrix[vehicleStartLocation[v[i]], activityStartLocation(i)] 
-%       /\
-%       e[i] <= vehicleEndTime[v[i]] - distMatrix[activityEndLocation(i), vehicleEndLocation[v[i]]]
-%     )
-% );
+constraint
+  forall(i in 1..numActivities)(
+    x[i] -> (
+      s[i] >= vehicleStartTime[v[i]] + distMatrix[vehicleStartLocation[v[i]], activityStartLocation(i)] 
+      /\
+      e[i] <= vehicleEndTime[v[i]] - distMatrix[activityEndLocation(i), vehicleEndLocation[v[i]]]
+    )
+);
 % TODO - should this take into account embark time?
 
 
@@ -295,14 +295,7 @@ constraint
 % solve satisfy;
 
 solve maximize sum(i in 1..R)(S[i]) ::bool_search(S, first_fail, indomain_max)
-          ::int_search(s, first_fail, indomain_min) % try replacing first_fail with most_constrained?
-          ::int_search(e, first_fail, indomain_min) % try replacing first_fail with most_constrained?
-          ::int_search(v, first_fail, indomain_random) % try replacing first_fail with most_constrained?
+          ::int_search(s, first_fail, indomain_min)
+          ::int_search(e, first_fail, indomain_min)
+          %::int_search(v, first_fail, indomain_random)
 ;
-
-% indomain_max on the values of S[] because we hope to try to satisfy as many
-% requests as possible
-
-% Values for start and end times are picked with a indomain_min heuristic to try and
-% explore parts of the search space where we may "have time" to select multiple
-% requests

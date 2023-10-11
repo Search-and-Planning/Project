@@ -20,7 +20,7 @@ class Vehicle:
     # available. To represent this in minizinc, we duplicate the vehicle for each
     # interval. This counter corresponds to how that shift will be identified
     # in minizinc
-    minizinc_id = count()
+    minizinc_id = count(1)
 
     def __init__(self, real_id, shift_start_time, shift_end_time, 
                 shift_start_location, shift_end_location, patient_categories,
@@ -63,7 +63,7 @@ class Vehicle:
 
 class Patient:
 
-    minizinc_id = count()
+    minizinc_id = count(1)
 
     def __init__(self, real_id, load, category, start, destination, end,
                  rdvTime, rdvDuration, srvDuration) -> None:
@@ -89,6 +89,37 @@ class Patient:
         "rdvTime: " + str(self.rdvTime) + \
         "rdvDuration: " + str(self.rdvDuration) + \
         "srvDuration: " + str(self.srvDuration)
+    
+
+class VehicleOutput:
+
+    class VehicleOutputEncoder(json.JSONEncoder):
+        """Class used to serialize profiles into a JSON string"""
+        def default(self, o):
+            return o.__dict__
+
+    class Trip:
+        def __init__(self, origin, destination, arrival, patients) -> None:
+            self.origin = origin
+            self.destination = destination
+            self.arrival = arrival
+            self.patients = patients
+
+    def __init__(self, id, trips):
+        self.id = id
+        self.trips = trips
+
+
+class Output():
+    
+        class OutputEncoder(json.JSONEncoder):
+            """Class used to serialize profiles into a JSON string"""
+            def default(self, o):
+                return o.__dict__
+    
+        def __init__(self, vehicles, requests):
+            self.requests = requests
+            self.vehicles = vehicles
 
 
 ###################################
@@ -103,6 +134,14 @@ def time_to_minutes(time: str) -> int:
 
     time = time.split('h')
     return int(time[0]) * 60 + int(time[1])
+
+
+def minutes_to_time(minutes: int) -> str:
+    """Converts a time in minutes to the format HHhMM"""
+
+    hours = minutes // 60
+    minutes = minutes % 60
+    return str(hours) + "h" + str(minutes)
 
 
 def flatten(l: list) -> list:
@@ -179,9 +218,6 @@ def print_instance_parameters(r, capacity, categories, compatiblePatients,
     # print("vehicleEndTime: ", vehicleEndTime)
     # print("vehicleStartLocation: ", vehicleStartLocation)
     # print("vehicleStartTime: ", vehicleStartTime)
-    for i in load:
-        if i <= 0:
-            print(i)
 
 
 
@@ -191,6 +227,12 @@ def increment_matrix(matrix):
     for i in range(len(matrix)):
         for j in range(len(matrix[i])):
             matrix[i][j] += 1
+
+
+def forwardActivity(n):
+    """Returns true if the activity is a forward activity, false otherwise"""
+
+    return (n % 2) == 0
 
 
 
@@ -344,11 +386,42 @@ if __name__ == "__main__":
     print("Search Complete!")
     print("type(result):", type(result))
     print("result.status:", result.status)
-    sleep(3)
     print("result:", result)
-    sleep(10)
-    print("result[0]:", result[0])
-    print("v:", result["v"])
+    # sleep(10)
+    #print("result[0]:", result[0])
+    # print("v:", result["v"])
+    objective = result["objective"]
+    v = result["v"]
+    outputVehicles = []
+    for vehicle in vehicles:
+        activityNum = 0
+        trips = []
+        for mini_zinc in v:
+            if mini_zinc == 0:
+                # Activity wasn't selected
+                activityNum += 1
+                continue
+
+            if mini_zinc == vehicle.minizinc_id:
+                origin = vehicle.shift_start_location
+                dest = vehicle.shift_end_location
+                arrival = vehicle.shift_start_time
+                if forwardActivity(activityNum):
+                    request = activityNum // 2
+                else:
+                    request = activityNum // 2 - 1
+
+                patientOutput = [patients[request].real_id]
+                trips.append(VehicleOutput.Trip(origin, dest, arrival, patientOutput))
+
+            activityNum += 1
+        outputVehicles.append(VehicleOutput(vehicle.real_id, trips))
+    
+    output = Output(outputVehicles, objective)
+
+    json.dump(output, open("output.json", "w"), indent=4, cls=Output.OutputEncoder)
+
+
 
     
     #################################
