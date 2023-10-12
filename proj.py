@@ -360,7 +360,8 @@ if __name__ == "__main__":
     patientTransportation = Model("./PatientTransportationProblem.mzn")
 
     # Get a solver
-    solver = Solver.lookup("gecode")
+    #solver = Solver.lookup("gecode")
+    solver = Solver.lookup("chuffed")
 
 
     # Create an Instance of the PTP model for the solver to solve

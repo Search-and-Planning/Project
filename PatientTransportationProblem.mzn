@@ -107,7 +107,6 @@ function int: activityTimeLowerBound(int: n) =
     rdvTime[n div 2] + rdvDuration[n div 2] + maxWaitTime % Backward Activity
   endif;
 
-% function var 0..timeHorizon: duration(int: activity) = e[activity] - s[activity];
 
 %%%%%%%%%%%%%%%%%%%
 %%% Constraints %%%
@@ -233,7 +232,7 @@ constraint
 % to go from the origin to the destination
 constraint
   forall(i in 1..numActivities)
-    (d[i] >= distMatrix[activityStartLocation(i), activityEndLocation(i)]);
+    (d[i] >= distMatrix[activityStartLocation(i), activityEndLocation(i)] + 2 * srv[activityToRequest(i)]);
     % (duration(i) >= distMatrix[activityStartLocation(i), activityEndLocation(i)]);
 
 
@@ -248,6 +247,21 @@ constraint
   forall(i in 1..numActivities)(
     d[i] = (e[i] - s[i])
 );
+
+
+% (Vehicle Availability) Equation 15 in the literature
+% Vehicles have intervals where they are available to handle requests and
+% those time windows may be non continuous
+constraint
+  forall(i in 1..numActivities)(
+    x[i] -> (
+      s[i] >= vehicleStartTime[v[i]] + distMatrix[vehicleStartLocation[v[i]], activityStartLocation(i)] 
+      /\
+      e[i] <= vehicleEndTime[v[i]] - distMatrix[activityEndLocation(i), vehicleEndLocation[v[i]]]
+    )
+);
+% TODO - should this take into account embark time?
+
 
 % (Cumulative Resource) Equation 9 in the literature
 % At any moment, the number of places occupied by patients
@@ -273,29 +287,13 @@ constraint
 % the activities not assigned to vehicle j
 
 
-% (Vehicle Availability) Equation 15 in the literature
-% Vehicles have intervals where they are available to handle requests and
-% those time windows may be non continuous
-constraint
-  forall(i in 1..numActivities)(
-    x[i] -> (
-      s[i] >= vehicleStartTime[v[i]] + distMatrix[vehicleStartLocation[v[i]], activityStartLocation(i)] 
-      /\
-      e[i] <= vehicleEndTime[v[i]] - distMatrix[activityEndLocation(i), vehicleEndLocation[v[i]]]
-    )
-);
-% TODO - should this take into account embark time?
-
-
 %%%%%%%%%%%%
 %%% Goal %%%
 %%%%%%%%%%%%
 % TODO - Experimentar substituir pelas equações 11 e/ou 12 ou fazer uma conjunção das 3
 
-% solve satisfy;
-
 solve maximize sum(i in 1..R)(S[i]) ::bool_search(S, first_fail, indomain_max)
           ::int_search(s, first_fail, indomain_min)
           ::int_search(e, first_fail, indomain_min)
-          %::int_search(v, first_fail, indomain_random)
+          ::int_search(v, first_fail, indomain_random)
 ;
