@@ -292,8 +292,14 @@ constraint
 %%%%%%%%%%%%
 % TODO - Experimentar substituir pelas equações 11 e/ou 12 ou fazer uma conjunção das 3
 
-solve maximize sum(i in 1..R)(S[i]) ::bool_search(S, first_fail, indomain_max)
-          ::int_search(s, first_fail, indomain_min)
-          ::int_search(e, first_fail, indomain_min)
-          ::int_search(v, first_fail, indomain_random)
+% solve maximize sum(i in 1..R)(S[i]) ::bool_search(S, first_fail, indomain_max)
+%           ::int_search(s, first_fail, indomain_min)
+%           ::int_search(e, first_fail, indomain_min)
+%           ::int_search(v, first_fail, indomain_random)
+% ;
+
+solve minimize sum(i in 1..R)(-1 * S[i]) ::bool_search(S, dom_w_deg, indomain_max)
+          ::int_search(s, impact, indomain_min)
+          ::int_search(e, impact, indomain_min)
+          ::int_search(v, impact, indomain_random)
 ;
