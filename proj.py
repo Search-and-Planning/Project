@@ -105,6 +105,11 @@ class VehicleOutput:
             self.arrival = arrival
             self.patients = patients
 
+
+        def __str__(self) -> str:
+            return "Trip from " + str(self.origin) + " to " + str(self.destination) + \
+                " arriving at " + str(self.arrival) + " with patients " + str(self.patients)
+
     def __init__(self, id, trips):
         self.id = id
         self.trips = trips
@@ -150,8 +155,13 @@ def flatten(l: list) -> list:
     return [item for subset in l for item in subset]
 
 
-def assign_instance_parameters(instance, r, capacity, categories, compatiblePatients,
-                            destination, distMatrix, endLocation, load, maxWaitTime,
+def matching_vehicles(mini_zinc_vehicle, vehicle):
+    return mini_zinc_vehicle == vehicle.minizinc_id
+
+
+
+def assign_instance_parameters(instance, r, capacity, categories, compatiblePatients, distMatrix,
+                             endLocation, load, maxWaitTime,
                             minCategory, maxCategory, numPlaces, numVehicles, patientCategory,
                             rdvDuration, rdvTime, srv, sameVehicleBackwards,
                             startLocation, timeHorizon, vehicleEndLocation, vehicleEndTime,
@@ -162,7 +172,7 @@ def assign_instance_parameters(instance, r, capacity, categories, compatiblePati
     instance["capacity"] = capacity
     instance["categories"] = categories
     instance["compatiblePatients"] = compatiblePatients
-    instance["destination"] = destination
+    #instance["destination"] = destination
     instance["distMatrix"] = distMatrix
     instance["endLocation"] = endLocation
     instance["load"] = load
@@ -184,8 +194,8 @@ def assign_instance_parameters(instance, r, capacity, categories, compatiblePati
     instance["vehicleStartTime"] = vehicleStartTime
 
 
-def print_instance_parameters(r, capacity, categories, compatiblePatients,
-                            destination, distMatrix, endLocation, load, maxWaitTime,
+def print_instance_parameters(r, capacity, categories, compatiblePatients,distMatrix, endLocation,
+                             load, maxWaitTime,
                             minCategory, maxCategory, numPlaces, numVehicles, patientCategory,
                             rdvDuration, rdvTime, srv, sameVehicleBackwards,
                             startLocation, timeHorizon, vehicleEndLocation, vehicleEndTime,
@@ -198,20 +208,20 @@ def print_instance_parameters(r, capacity, categories, compatiblePatients,
     # print("destination: ", destination)
     #print("0 in destination: ", 0 in destination)
     # print("distMatrix: ", distMatrix)
-    # print("endLocation: ", endLocation)
+    print("endLocation: ", endLocation)
     #print("0 in endLocation: ", 0 in endLocation)
     #print("load: ", load)
-    # print("maxWaitTime: ", maxWaitTime)
+    print("maxWaitTime: ", maxWaitTime)
     # print("minCategory: ", minCategory)
     # print("maxCategory: ", maxCategory)
     # print("numPlaces: ", numPlaces)
     # print("numVehicles: ", numVehicles)
     # print("patientCategory: ", patientCategory)
-    #print("rdvDuration: ", rdvDuration)
-    #print("rdvTime: ", rdvTime)
-    # print("srv: ", srv)
+    print("rdvDuration: ", rdvDuration)
+    print("rdvTime: ", rdvTime)
+    print("srv: ", srv)
     # print("sameVehicleBackwards: ", sameVehicleBackwards)
-    #print("startLocation: ", startLocation)
+    print("startLocation: ", startLocation)
     #print("0 in startLocation: ", 0 in startLocation)
     # print("timeHorizon: ", timeHorizon)
     # print("vehicleEndLocation: ", vehicleEndLocation)
@@ -308,7 +318,7 @@ if __name__ == "__main__":
 
 
     start = []
-    destination = []
+    # destination = []
     end = []
     load = []
     patientCategory = []
@@ -319,35 +329,44 @@ if __name__ == "__main__":
     patients = []
     for patient in data["patients"]:
         s = patient["start"]
-        d = patient["destination"]
+        d1 = patient["destination"]
+        d2 = d1
         e = patient["end"]
         l = patient["load"]
         c = patient["category"]
         appStart = time_to_minutes(patient["rdvTime"])
         appDuration = time_to_minutes(patient["rdvDuration"])
         embar = time_to_minutes(patient["srvDuration"])
+        patients.append(Patient(patient["id"], l, c, s, d1, e, appStart, appDuration, embar))
         if (s == -1):
             # No forward activity for this request
-            s = d
+            s -=  1
+            d1 = s
+        # Forward Activity
+        start.append(s + 1) # minizinc model starts at 1
+        end.append(d1 + 1)
+
         if (e == -1):
             # No backward activity for this request
-            e = d
+            e -= 1
+            d2 = e
         if (not c in flattenedCategories):
             flattenedCategories.append(c)
-        start.append(s + 1) # minizinc model starts at 1
-        destination.append(d + 1)
+
+        # Backward Activity
+        start.append(d2 + 1)
         end.append(e + 1)
+
+
         appointmentStart.append(appStart)
         appointmentDuration.append(appDuration)
         embarkDuration.append(embar)
         load.append(l)
         patientCategory.append(c)
-        patients.append(Patient(patient["id"], l, c, s, d, e, appStart, appDuration, embar))
 
         numRequests += 1
 
     adjMatrix = data["distMatrix"]
-    #increment_matrix(adjMatrix)
 
 
     #################################
@@ -368,16 +387,26 @@ if __name__ == "__main__":
     instance = Instance(solver, patientTransportation)
 
     # Assign instance parameters
-    assign_instance_parameters(instance, numRequests, capacity, categories, categories,
-                            destination, adjMatrix, end, load, maxWaitTime,
+    # assign_instance_parameters(instance, numRequests, capacity, categories, categories,
+    #                         destination, adjMatrix, end, load, maxWaitTime,
+    #                         min(flattenedCategories), max(flattenedCategories), numPlaces, numVehicles, patientCategory,
+    #                         appointmentDuration, appointmentStart, embarkDuration, sameVehicleBackwards,
+    #                         start, timeHorizon, vehicleEndLocation, vehicleEndTime,
+    #                         vehicleStartLocation, vehicleStartTime)
+    assign_instance_parameters(instance, numRequests, capacity, categories, categories, adjMatrix, end, load, maxWaitTime,
                             min(flattenedCategories), max(flattenedCategories), numPlaces, numVehicles, patientCategory,
                             appointmentDuration, appointmentStart, embarkDuration, sameVehicleBackwards,
                             start, timeHorizon, vehicleEndLocation, vehicleEndTime,
-                            vehicleStartLocation, vehicleStartTime)
-    
+                            vehicleStartLocation, vehicleStartTime)    
+
     # Solve the instance
-    print_instance_parameters(numRequests, capacity, categories, categories,
-                            destination, adjMatrix, end, load, maxWaitTime,
+    # print_instance_parameters(numRequests, capacity, categories, categories,
+    #                         destination, adjMatrix, end, load, maxWaitTime,
+    #                         min(flattenedCategories), max(flattenedCategories), numPlaces, numVehicles, patientCategory,
+    #                         appointmentDuration, appointmentStart, embarkDuration, sameVehicleBackwards,
+    #                         start, timeHorizon, vehicleEndLocation, vehicleEndTime,
+    #                         vehicleStartLocation, vehicleStartTime)
+    print_instance_parameters(numRequests, capacity, categories, categories, adjMatrix, end, load, maxWaitTime,
                             min(flattenedCategories), max(flattenedCategories), numPlaces, numVehicles, patientCategory,
                             appointmentDuration, appointmentStart, embarkDuration, sameVehicleBackwards,
                             start, timeHorizon, vehicleEndLocation, vehicleEndTime,
@@ -393,29 +422,58 @@ if __name__ == "__main__":
     # print("v:", result["v"])
     objective = result["objective"]
     v = result["v"]
+    x = result["x"]
+    s = [minutes_to_time(m) for m in result["s"]]
+    e = [minutes_to_time(m) for m in result["e"]]
     outputVehicles = []
     for vehicle in vehicles:
-        activityNum = 0
+        #activityNum = 0
         trips = []
-        for mini_zinc in v:
-            if mini_zinc == 0:
+        patientOutput = []
+        last_location = vehicle.shift_start_location
+        last_time = 0
+        for activityNum in range(len(s)):
+            if x[activityNum] == 0 or not matching_vehicles(v[activityNum], vehicle):
                 # Activity wasn't selected
-                activityNum += 1
                 continue
+            else:
+                # Activity was selected
+                patient = activityNum // 2
+                assigned_vehicle = v[activityNum]
+                # print("activity num:", activityNum)
+                # print("patient:", patient)
+                # print("patients[patient]:", patients[patient])
+                # print("patients[patient].real_id:", patients[patient].real_id)
+                origin = start[activityNum] - 1
+                dest = end[activityNum] - 1
 
-            if mini_zinc == vehicle.minizinc_id:
-                origin = vehicle.shift_start_location
-                dest = vehicle.shift_end_location
-                arrival = vehicle.shift_start_time
-                if forwardActivity(activityNum):
-                    request = activityNum // 2
-                else:
-                    request = activityNum // 2 - 1
+                # Go to pick up location
+                if (last_location != origin):
+                    trips.append(VehicleOutput.Trip(last_location, origin, s[activityNum], patientOutput))
 
-                patientOutput = [patients[request].real_id]
-                trips.append(VehicleOutput.Trip(origin, dest, arrival, patientOutput))
+                # Board patient
+                # print("origin == dest:", origin == dest)
+                # print("activityNum:", activityNum)
+                patientOutput += [p for p in patientOutput] + [patients[patient].real_id]
 
-            activityNum += 1
+                # Go to drop off point
+                trips.append(VehicleOutput.Trip(origin, dest, e[activityNum], [p for p in patientOutput]))
+
+                # Remove patient from vehicle
+                patientOutput.remove(patients[patient].real_id)
+                last_location = dest
+                last_time = e[activityNum]
+        
+        # TODO - trip back to vehicle end location
+        if (last_location != vehicle.shift_end_location):
+            print("last_location:", last_location)
+            print("vehicle.shift_end_location:", vehicle.shift_end_location)
+            dest = vehicle.shift_end_location
+            dropoff_time = minutes_to_time(time_to_minutes(last_time) + adjMatrix[last_location][dest])
+            trips.append(VehicleOutput.Trip(last_location, dest, dropoff_time, []))
+        # print("trips:")
+        # for trip in trips:
+        #     print(trip)
         outputVehicles.append(VehicleOutput(vehicle.real_id, trips))
     
     output = Output(outputVehicles, objective)

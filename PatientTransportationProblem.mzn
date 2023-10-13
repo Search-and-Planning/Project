@@ -42,9 +42,9 @@ array[1..R] of minCategory..maxCategory: patientCategory; % category of the pati
 array[1..R] of int: rdvTime; % rdvTime[i] = starting time of appointment for request i. (ui in the literature)
 array[1..R] of int: rdvDuration; % duration of the ith request's appointment. (di in the literature)
 array[1..R] of int: srv; % embark/disembark time of the ith patient to a vehicle
-array[1..R] of int: startLocation;
-array[1..R] of int: destination;
-array[1..R] of int: endLocation;
+array[1..numActivities] of int: startLocation;
+%array[1..R] of int: destination;
+array[1..numActivities] of int: endLocation;
 array[1..R] of int: load; % number of places taken by patient i in the vehicle (l[i] in the literature)
 
 
@@ -72,10 +72,9 @@ array[1..R] of var bool: S; % S[i] = 1 if request i is selected, 0 otherwise
 %%%    and     %%%
 %%% Predicates %%%
 %%%%%%%%%%%%%%%%%%
-% TODO - review computation (acho que está bem)
 function int: nthForwardActivity(int: n) = (2 * n) - 1;
 
-% TODO - review computation (acho que está bem)
+
 function int: nthBackwardActivity(int: n) = 2 * n;
 
 function int: activityToRequest(int: n) = 
@@ -85,21 +84,6 @@ function int: activityToRequest(int: n) =
     n div 2 % Backward Activity
   endif;
 
-function int: activityStartLocation(int: n) = 
-  if (n mod 2) == 1 then
-    startLocation[(n div 2) + 1] % Forward activity
-  else
-    destination[n div 2] % Backward Activity
-  endif;
-  
-function int: activityEndLocation(int: n) =
-  if (n mod 2) == 1 then
-    destination[(n div 2) + 1] % Forward activity
-  else
-    endLocation[n div 2] % Backward Activity
-  endif;
-
-% TODO - review indices on the else branch (Should be good now?)
 function int: activityTimeLowerBound(int: n) =
   if (n mod 2) == 1 then
     0 % Forward activity
@@ -107,10 +91,27 @@ function int: activityTimeLowerBound(int: n) =
     rdvTime[n div 2] + rdvDuration[n div 2] + maxWaitTime % Backward Activity
   endif;
 
+function int: activityTimeUpperBound(int: n) =
+  if (n mod 2) == 1 then
+    rdvTime[n div 2 + 1] % Forward activity
+  else
+    timeHorizon % Backward Activity
+  endif;
+
 
 %%%%%%%%%%%%%%%%%%%
 %%% Constraints %%%
 %%%%%%%%%%%%%%%%%%%
+
+% Don't select forward activity if the request doesn't have one
+constraint
+  forall(i in 1..numActivities)
+    (startLocation[i] == -1 -> x[i] == 0);
+
+% Don't select backward activity if the request doesn't have one
+constraint
+  forall(i in 1..numActivities)
+    (endLocation[i] == -1 -> x[i] == 0);
 
 % (Empty Locations) Equation 17 in the literature
 % Selecting a Request is equivalent to selecting the corresponding
@@ -122,45 +123,19 @@ constraint
     ( (x[nthForwardActivity(i)] == 1 \/ x[nthBackwardActivity(i)] == 1) -> S[i] == 1 )
 ); % Need both implications to make it an equivalence
 
-
-% Don't select forward activity if the request doesn't have one
-constraint
-  forall(i in 1..R)
-    (startLocation[i] == -1 -> x[nthForwardActivity(i)] == 0);
-
-% Don't select backward activity if the request doesn't have one
-constraint
-  forall(i in 1..R)
-    (endLocation[i] == -1 -> x[nthBackwardActivity(i)] == 0);
-
 % If request has both kind of activities, they must either both be selected
 % or neither is selected
 constraint
   forall(i in 1..R)(
-    (startLocation[i] != -1 /\ endLocation[i] != -1) -> 
+    (startLocation[nthForwardActivity(i)] != -1 /\ endLocation[nthBackwardActivity(i)] != -1) -> 
     (x[nthForwardActivity(i)] == x[nthBackwardActivity(i)])
 );
 
-    
-% Patients must be at their destinations within certain time windows
-% equation 14 in the literature (starting times)
+% Lower bound for start of backward activity must take into account the
+% start of the appointment of the forward activity and the appointment duration
 constraint
   forall(i in 1..R)(
-    ( (0 <= s[nthForwardActivity(i)]) /\ (s[nthForwardActivity(i)] <= (rdvTime[i] - maxWaitTime) ) )
-    /\
-    ( ( (rdvTime[i] + rdvDuration[i] + maxWaitTime) <= s[nthBackwardActivity(i)]) /\ (s[nthBackwardActivity(i)] <= timeHorizon) )
-);
-    
-
-% and the s[] equivalent; Or see if the pruning improves by making it a unary constraint
-% equation 14 in the literature (ending times)
-constraint
-  forall(i in 1..R)(
-    % Restrict domain for end of forward activities
-    ( (0 <= e[nthForwardActivity(i)]) /\ (e[nthForwardActivity(i)] <= (rdvTime[i] - maxWaitTime)) )
-    /\
-    % Restrict domain for end of backward activities
-    ( ( (rdvTime[i] + rdvDuration[i] + maxWaitTime) <= e[nthBackwardActivity(i)]) /\ (e[nthBackwardActivity(i)] <= timeHorizon) )
+    s[nthBackwardActivity(i)] >= e[nthForwardActivity(i)] + rdvDuration[activityToRequest(i)]
 );
    
     
@@ -180,16 +155,17 @@ constraint
     /\
     ( (v[i] == 0) -> (not x[i]) )
     /\
-    ( (not x[i]) -> (s[i] = activityTimeLowerBound(i)) )
+    ( (not x[i]) -> (e[i] = activityTimeUpperBound(i)) )
     /\
-    ( (not x[i]) -> (e[i] = activityTimeLowerBound(i)) )
+    ( (not x[i]) -> (s[i] = activityTimeUpperBound(i)) )
 );
 
 % If an activity was selected, a vehicle must be assigned to it
-constraint
-  forall(i in 1..numActivities)(
-    x[i] -> (v[i] != 0)
-);
+% constraint
+%   forall(i in 1..numActivities)(
+%     x[i] -> (v[i] != 0)
+% );
+% TODO - is this one needed? (I think it is redundant with the previous one)
 
 
 % Patients can only be taken by some vehicle categories
@@ -205,24 +181,26 @@ constraint
       % if the backward activity is selected, the vehicle must be compatible with the patient
       patientCategory[i] in compatiblePatients[v[nthBackwardActivity(i)]]
     ))
-); % TODO - Try replacing the if condition by x[] != 0 and see if the inference improves or worsens
+);
 
     
 % (Inter-Activity Time Travel Consistency) Equation 6 in the literature
 constraint
   forall(i in 1..numActivities, j in i+1..numActivities)(
-    if v[i] != 0 then % if vehicles were selected for the activities
-      (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[activityStartLocation(i), activityStartLocation(j)] + srv[activityToRequest(i)])
-                      \/ ( s[i] - s[j] >= distMatrix[activityStartLocation(j), activityStartLocation(i)] + srv[activityToRequest(j)]) )
-      /\
-      (v[i] == v[j]) -> ( (s[j] - e[i] >= distMatrix[activityStartLocation(i), activityEndLocation(j)]) 
-                      \/ ( e[i] - s[j] >= distMatrix[activityEndLocation(j), activityStartLocation(i)] + srv[activityToRequest(j)] + srv[activityToRequest(i)]) )
-      /\
-      (v[i] == v[j]) -> ( (e[j] - s[i] >= distMatrix[activityEndLocation(i), activityStartLocation(j)] + srv[activityToRequest(i)] + srv[activityToRequest(j)]) 
-                      \/ ( s[i] - e[j] >= distMatrix[activityStartLocation(j), activityEndLocation(i)]) )
-      /\
-      (v[i] == v[j]) -> ( (e[j] - e[i] >= distMatrix[activityEndLocation(i), activityEndLocation(j)] + srv[activityToRequest(j)]) 
-                      \/ ( e[i] - e[j] >= distMatrix[activityEndLocation(j), activityEndLocation(i)] + srv[activityToRequest(i)]) )
+    if (v[i] != 0 /\ v[j] != 0 /\ startLocation[i] != -1 /\ startLocation[j] != -1
+        /\ endLocation[i] != -1 /\ endLocation[j] != -1) then % if vehicles were selected for the activities
+
+        (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[startLocation[i], startLocation[j]] + srv[activityToRequest(i)])
+                        \/ ( s[i] - s[j] >= distMatrix[startLocation[j], startLocation[i]] + srv[activityToRequest(j)]) )
+        /\
+        (v[i] == v[j]) -> ( (s[j] - e[i] >= distMatrix[startLocation[i], endLocation[j]]) 
+                        \/ ( e[i] - s[j] >= distMatrix[endLocation[j], startLocation[i]] + srv[activityToRequest(j)] + srv[activityToRequest(i)]) )
+        /\
+        (v[i] == v[j]) -> ( (e[j] - s[i] >= distMatrix[endLocation[i], startLocation[j]] + srv[activityToRequest(i)] + srv[activityToRequest(j)]) 
+                        \/ ( s[i] - e[j] >= distMatrix[startLocation[j], endLocation[i]]) )
+        /\
+        (v[i] == v[j]) -> ( (e[j] - e[i] >= distMatrix[endLocation[i], endLocation[j]] + srv[activityToRequest(j)]) 
+                        \/ ( e[i] - e[j] >= distMatrix[endLocation[j], endLocation[i]] + srv[activityToRequest(i)]) )
     endif
 );
 
@@ -231,17 +209,20 @@ constraint
 % The duration of each activity cannot be lesser than the time required 
 % to go from the origin to the destination
 constraint
-  forall(i in 1..numActivities)
-    (d[i] >= distMatrix[activityStartLocation(i), activityEndLocation(i)] + 2 * srv[activityToRequest(i)]);
-    % (duration(i) >= distMatrix[activityStartLocation(i), activityEndLocation(i)]);
+  forall(i in 1..numActivities)(
+    ( (startLocation[i] != -1 /\ endLocation[i] != -1) ) -> (
+      % Implication makes sure that if an activity doesn't "exist", the constraint doesn't apply
+      (d[i] >= distMatrix[startLocation[i], endLocation[i]] + 2 * srv[activityToRequest(i)])
+    )
+);
 
 
 % Activity duration can't be negative
 % Redundant with Intra-Activity Time Travel Consistency constraint
-% constraint
-%   forall(i in 1..numActivities)(
-%     e[i] >= s[i]
-% );
+constraint
+  forall(i in 1..numActivities)(
+    e[i] >= s[i]
+);
 
 constraint 
   forall(i in 1..numActivities)(
@@ -254,10 +235,10 @@ constraint
 % those time windows may be non continuous
 constraint
   forall(i in 1..numActivities)(
-    x[i] -> (
-      s[i] >= vehicleStartTime[v[i]] + distMatrix[vehicleStartLocation[v[i]], activityStartLocation(i)] 
+    (startLocation[i] != -1 /\ endLocation[i] != -1) -> (
+      s[i] >= vehicleStartTime[v[i]] + distMatrix[vehicleStartLocation[v[i]], startLocation[i]]
       /\
-      e[i] <= vehicleEndTime[v[i]] - distMatrix[activityEndLocation(i), vehicleEndLocation[v[i]]]
+      e[i] <= vehicleEndTime[v[i]] - distMatrix[endLocation[i], vehicleEndLocation[v[i]]]
     )
 );
 % TODO - should this take into account embark time?
@@ -270,7 +251,6 @@ constraint
   forall(j in 1..numVehicles)( % For each vehicle
     cumulative(
     [s[i] * bool2int(j == v[i])| i in 1..numActivities], % starting times for activities assigned to vehicle j
-    % [duration(i) * bool2int(j == v[i])| i in 1..numActivities],
     [d[i] * bool2int(j == v[i])| i in 1..numActivities], % durations of those activities
     [load[activityToRequest(i)] * bool2int(j == v[i])| i in 1..numActivities], % resource consumption of those activities
     capacity[j]
@@ -290,7 +270,6 @@ constraint
 %%%%%%%%%%%%
 %%% Goal %%%
 %%%%%%%%%%%%
-% TODO - Experimentar substituir pelas equações 11 e/ou 12 ou fazer uma conjunção das 3
 
 % solve maximize sum(i in 1..R)(S[i]) ::bool_search(S, first_fail, indomain_max)
 %           ::int_search(s, first_fail, indomain_min)
