@@ -114,6 +114,9 @@ class VehicleOutput:
         self.id = id
         self.trips = trips
 
+    def __eq__(self, __value: object) -> bool:
+        return self.id == __value.id
+
 
 class Output():
     
@@ -170,7 +173,7 @@ def assign_instance_parameters(instance, r, capacity, categories, compatiblePati
 
     instance["R"] = r
     instance["capacity"] = capacity
-    instance["categories"] = categories
+    # instance["categories"] = categories
     instance["compatiblePatients"] = compatiblePatients
     #instance["destination"] = destination
     instance["distMatrix"] = distMatrix
@@ -201,33 +204,33 @@ def print_instance_parameters(r, capacity, categories, compatiblePatients,distMa
                             startLocation, timeHorizon, vehicleEndLocation, vehicleEndTime,
                             vehicleStartLocation, vehicleStartTime):
     """Prints the instance parameters"""
-    # print("R: ", r)
-    # print("capacity: ", capacity)
+    print("R: ", r)
+    print("capacity: ", capacity)
     # print("categories: ", categories)
-    # print("compatiblePatients: ", compatiblePatients)
+    print("compatiblePatients: ", compatiblePatients)
     # print("destination: ", destination)
     #print("0 in destination: ", 0 in destination)
-    # print("distMatrix: ", distMatrix)
+    print("distMatrix: ", distMatrix)
     print("endLocation: ", endLocation)
     #print("0 in endLocation: ", 0 in endLocation)
-    #print("load: ", load)
+    print("load: ", load)
     print("maxWaitTime: ", maxWaitTime)
-    # print("minCategory: ", minCategory)
-    # print("maxCategory: ", maxCategory)
-    # print("numPlaces: ", numPlaces)
-    # print("numVehicles: ", numVehicles)
-    # print("patientCategory: ", patientCategory)
+    print("minCategory: ", minCategory)
+    print("maxCategory: ", maxCategory)
+    print("numPlaces: ", numPlaces)
+    print("numVehicles: ", numVehicles)
+    print("patientCategory: ", patientCategory)
     print("rdvDuration: ", rdvDuration)
     print("rdvTime: ", rdvTime)
     print("srv: ", srv)
-    # print("sameVehicleBackwards: ", sameVehicleBackwards)
+    print("sameVehicleBackwards: ", sameVehicleBackwards)
     print("startLocation: ", startLocation)
-    #print("0 in startLocation: ", 0 in startLocation)
-    # print("timeHorizon: ", timeHorizon)
-    # print("vehicleEndLocation: ", vehicleEndLocation)
-    # print("vehicleEndTime: ", vehicleEndTime)
-    # print("vehicleStartLocation: ", vehicleStartLocation)
-    # print("vehicleStartTime: ", vehicleStartTime)
+    print("0 in startLocation: ", 0 in startLocation)
+    print("timeHorizon: ", timeHorizon)
+    print("vehicleEndLocation: ", vehicleEndLocation)
+    print("vehicleEndTime: ", vehicleEndTime)
+    print("vehicleStartLocation: ", vehicleStartLocation)
+    print("vehicleStartTime: ", vehicleStartTime)
 
 
 
@@ -244,6 +247,20 @@ def forwardActivity(n):
 
     return (n % 2) == 0
 
+
+def terminate_unsatisfiable(vehicles):
+    """Prints an error message and exits the program if the model is unsatisfiable"""
+
+    print("Model is unsatisfiable!")
+    vehicleOutputs = []
+    for vehicle in vehicles:
+        tmpOutput = VehicleOutput(vehicle.real_id, [])
+        if not tmpOutput in vehicleOutputs:
+            vehicleOutputs.append(tmpOutput)
+
+    output = Output(vehicleOutputs, 0)
+    json.dump(output, open("output.json", "w"), indent=4, cls=Output.OutputEncoder)
+    exit(1)
 
 
 ###################################
@@ -293,7 +310,6 @@ if __name__ == "__main__":
     timeHorizon = 0
     numVehicles = 0
     for vehicle in data["vehicles"]:
-        numVehicles += 1
         availabilities = vehicle["availability"]
 
         for availability in availabilities:
@@ -315,6 +331,9 @@ if __name__ == "__main__":
             vehicles.append(Vehicle(vehicle["id"], startTime, endTime, vehicle["start"], 
                                     vehicle["end"], vehicle["canTake"],
                                     vehicle["capacity"]))
+            
+            # Each availability is a different vehicle in the minizinc model
+            numVehicles += 1
 
 
     start = []
@@ -417,10 +436,13 @@ if __name__ == "__main__":
     print("type(result):", type(result))
     print("result.status:", result.status)
     print("result:", result)
-    # sleep(10)
     #print("result[0]:", result[0])
     # print("v:", result["v"])
-    objective = result["objective"]
+    try:
+        objective = result["objective"]
+    except KeyError:
+        terminate_unsatisfiable(vehicles)
+
     v = result["v"]
     x = result["x"]
     s = [minutes_to_time(m) for m in result["s"]]
@@ -464,16 +486,10 @@ if __name__ == "__main__":
                 last_location = dest
                 last_time = e[activityNum]
         
-        # TODO - trip back to vehicle end location
         if (last_location != vehicle.shift_end_location):
-            print("last_location:", last_location)
-            print("vehicle.shift_end_location:", vehicle.shift_end_location)
             dest = vehicle.shift_end_location
             dropoff_time = minutes_to_time(time_to_minutes(last_time) + adjMatrix[last_location][dest])
             trips.append(VehicleOutput.Trip(last_location, dest, dropoff_time, []))
-        # print("trips:")
-        # for trip in trips:
-        #     print(trip)
         outputVehicles.append(VehicleOutput(vehicle.real_id, trips))
     
     output = Output(outputVehicles, objective)

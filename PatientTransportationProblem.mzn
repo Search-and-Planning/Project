@@ -8,7 +8,6 @@
 % hdl.handle.net/2078.1/202079 -- DOI : 10.1007/978-3-319-98334-9_32
 
 include "cumulative.mzn";
-%include "minisearch.mzn";
 
 %%%%%%%%%%%%%%%%%%
 %%% Parameters %%%
@@ -56,7 +55,7 @@ array[1..R] of int: load; % number of places taken by patient i in the vehicle (
 
 array[1..numActivities] of var 0..timeHorizon: s;
 array[1..numActivities] of var 0..timeHorizon: e;
-array[1..numActivities] of var 0..maxWaitTime: d;
+array[1..numActivities] of var 0..timeHorizon: d;
 
 % v[i] is the vehicle assigned to activity i
 % 0 represents that no vehicle was selected
@@ -93,15 +92,18 @@ function int: activityTimeLowerBound(int: n) =
 
 function int: activityTimeUpperBound(int: n) =
   if (n mod 2) == 1 then
-    rdvTime[n div 2 + 1] % Forward activity
+    rdvTime[n div 2 + 1] - maxWaitTime % Forward activity
   else
-    timeHorizon % Backward Activity
+    rdvTime[n div 2] + rdvDuration[n div 2] + maxWaitTime % Backward Activity
   endif;
 
 
 %%%%%%%%%%%%%%%%%%%
 %%% Constraints %%%
 %%%%%%%%%%%%%%%%%%%
+
+
+%%% Activity Selection Constraints %%%
 
 % Don't select forward activity if the request doesn't have one
 constraint
@@ -131,20 +133,44 @@ constraint
     (x[nthForwardActivity(i)] == x[nthBackwardActivity(i)])
 );
 
-% Lower bound for start of backward activity must take into account the
-% start of the appointment of the forward activity and the appointment duration
-constraint
-  forall(i in 1..R)(
-    s[nthBackwardActivity(i)] >= e[nthForwardActivity(i)] + rdvDuration[activityToRequest(i)]
-);
+
+%%% Activity Time Constraints %%%
+
+
+% % Lower bound for start of backward activity must take into account the
+% % start of the appointment of the forward activity and the appointment duration
+% constraint
+%   forall(i in 1..R)(
+%     s[nthBackwardActivity(i)] >= e[nthForwardActivity(i)] + rdvDuration[activityToRequest(i)]
+% );
    
     
-% Instances restricting forward and backward activities to have the same vehicle
+% % Instances restricting forward and backward activities to have the same vehicle
+% constraint
+%   sameVehicleBackwards -> forall(i in 1..R)(
+%     v[nthForwardActivity(i)] == v[nthBackwardActivity(i)]
+% );
+
+% Patients must arrive at the appointment before it starts
 constraint
-  sameVehicleBackwards -> forall(i in 1..R)(
-    v[nthForwardActivity(i)] == v[nthBackwardActivity(i)]
+  forall(i in 1..R)(
+    e[nthForwardActivity(i)] <= rdvTime[i]
 );
-  
+
+% Patients can only be taken back home after their appointment is over
+constraint
+  forall(i in 1..R)(
+    s[nthBackwardActivity(i)] >= (rdvTime[i] + rdvDuration[i])
+);
+
+constraint
+  forall(i in 1..R)(
+    % Patients can't wait more than maxWaitTime for their appointments
+    (s[nthForwardActivity(i)] >= (rdvTime[i] - maxWaitTime) )
+    /\
+    (e[nthBackwardActivity(i)] <= (rdvTime[i] + rdvDuration[i] + maxWaitTime) )
+);
+
 
 % If an activity isn't selected, the values for the assigned vehicle,
 % starting time and end time should reflect that 
@@ -155,17 +181,12 @@ constraint
     /\
     ( (v[i] == 0) -> (not x[i]) )
     /\
-    ( (not x[i]) -> (e[i] = activityTimeUpperBound(i)) )
-    /\
-    ( (not x[i]) -> (s[i] = activityTimeUpperBound(i)) )
+    ( (not x[i]) -> (d[i] = 0) )
+    % /\
+    % ( (not x[i]) -> (e[i] = activityTimeUpperBound(i)) )
+    % /\
+    % ( (not x[i]) -> (s[i] = activityTimeUpperBound(i)) )
 );
-
-% If an activity was selected, a vehicle must be assigned to it
-% constraint
-%   forall(i in 1..numActivities)(
-%     x[i] -> (v[i] != 0)
-% );
-% TODO - is this one needed? (I think it is redundant with the previous one)
 
 
 % Patients can only be taken by some vehicle categories
@@ -188,16 +209,17 @@ constraint
 constraint
   forall(i in 1..numActivities, j in i+1..numActivities)(
     if (v[i] != 0 /\ v[j] != 0 /\ startLocation[i] != -1 /\ startLocation[j] != -1
-        /\ endLocation[i] != -1 /\ endLocation[j] != -1) then % if vehicles were selected for the activities
+        /\ endLocation[i] != -1 /\ endLocation[j] != -1) then
+    % if vehicles were selected for the activities and the activities exist
 
         (v[i] == v[j]) -> ( (s[j] - s[i] >= distMatrix[startLocation[i], startLocation[j]] + srv[activityToRequest(i)])
                         \/ ( s[i] - s[j] >= distMatrix[startLocation[j], startLocation[i]] + srv[activityToRequest(j)]) )
         /\
-        (v[i] == v[j]) -> ( (s[j] - e[i] >= distMatrix[startLocation[i], endLocation[j]]) 
-                        \/ ( e[i] - s[j] >= distMatrix[endLocation[j], startLocation[i]] + srv[activityToRequest(j)] + srv[activityToRequest(i)]) )
+        (v[i] == v[j]) -> ( (s[j] - e[i] >= distMatrix[endLocation[i], startLocation[j]]) 
+                        \/ ( e[i] - s[j] >= distMatrix[startLocation[j], endLocation[i]] + srv[activityToRequest(j)] + srv[activityToRequest(i)]) )
         /\
-        (v[i] == v[j]) -> ( (e[j] - s[i] >= distMatrix[endLocation[i], startLocation[j]] + srv[activityToRequest(i)] + srv[activityToRequest(j)]) 
-                        \/ ( s[i] - e[j] >= distMatrix[startLocation[j], endLocation[i]]) )
+        (v[i] == v[j]) -> ( (e[j] - s[i] >= distMatrix[startLocation[i], endLocation[j]] + srv[activityToRequest(i)] + srv[activityToRequest(j)]) 
+                        \/ ( s[i] - e[j] >= distMatrix[endLocation[j], startLocation[i]]) )
         /\
         (v[i] == v[j]) -> ( (e[j] - e[i] >= distMatrix[endLocation[i], endLocation[j]] + srv[activityToRequest(j)]) 
                         \/ ( e[i] - e[j] >= distMatrix[endLocation[j], endLocation[i]] + srv[activityToRequest(i)]) )
@@ -241,7 +263,6 @@ constraint
       e[i] <= vehicleEndTime[v[i]] - distMatrix[endLocation[i], vehicleEndLocation[v[i]]]
     )
 );
-% TODO - should this take into account embark time?
 
 
 % (Cumulative Resource) Equation 9 in the literature
@@ -271,14 +292,15 @@ constraint
 %%% Goal %%%
 %%%%%%%%%%%%
 
-% solve maximize sum(i in 1..R)(S[i]) ::bool_search(S, first_fail, indomain_max)
-%           ::int_search(s, first_fail, indomain_min)
-%           ::int_search(e, first_fail, indomain_min)
-%           ::int_search(v, first_fail, indomain_random)
-% ;
-
-solve minimize sum(i in 1..R)(-1 * S[i]) ::bool_search(S, dom_w_deg, indomain_max)
-          ::int_search(s, impact, indomain_min)
-          ::int_search(e, impact, indomain_min)
-          ::int_search(v, impact, indomain_random)
+solve maximize sum(i in 1..R)(S[i]) ::bool_search(S, first_fail, indomain_max)
+          ::int_search(s, first_fail, indomain_min)
+          ::int_search(e, first_fail, indomain_min)
+          ::int_search(v, first_fail, indomain_random)
+          ::int_search(d, first_fail, indomain_min)
 ;
+
+% solve minimize sum(i in 1..R)(-1 * S[i]) ::bool_search(S, dom_w_deg, indomain_max)
+%           ::int_search(s, impact, indomain_min)
+%           ::int_search(e, impact, indomain_min)
+%           ::int_search(v, impact, indomain_random)
+% ;
